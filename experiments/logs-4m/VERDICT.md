@@ -155,3 +155,25 @@ write-once-read-exact mechanics apply.
 - v6 scale test: experiments/s9v6_P4MID.log (8192 steps, 4 exp/fact).
 - v8 hash placement: chain_v8.sh (H4/H4MID 16.8M + H4 anchor; s9v8_*.log);
   hash impl in navi/pkm.py _hash_path + MemoryConfig.hash_slots.
+## Scaling tests (2026-09-04/05, 8-core TPU v3-8)
+**Sweep B (exposure, c1=c2=512 = 1.05M slots/class):** 8000 steps vs the
+original 4000 - held-out bpc 1.7997 -> **1.7381**; Pool-zero sabotage gap
+2.11 -> **2.27** bits (extra training went into the Pool, not the backbone).
+Exposure is confirmed as a first-order lever.
+
+**Sweep A (capacity, 4M slots/class = 1.08B params):** infrastructure-killed
+three times (AdamW m/v HBM OOM -> slot-sharding fixed it; 13G full-state
+ckpts filling 20G kernel disk -> params-only + Lion fixed it; a stale
+zombie process racing the same ckpt path), then the kernel died at
+~9h uptime with the run at step ~2200/4000. Training trajectory to that
+point (bpc): 3.20@250, 2.57@500, 2.23@750, 2.10@1000 - behind the 1M-slot
+arm at matched steps, consistent with the exposure prediction (4x slots,
+same tokens = fewer exposures/slot); final eval missing, no capacity
+conclusion. Optimizer switched to **Lion** (momentum-only: opt state 1x
+params vs AdamW 2x; ckpts to kernel home dir; kernel-side Lion lr 3e-4,
+mem-grad 10x scale in update).
+
+Infra lessons banked in sweep_scale.py: slot-sharded values, Lion,
+params-only ckpts in ~/experiments, NAVI_RESUME=1 gate.
+Logs: logs-4m/sweep_B512.log (complete), scale_B512.txt,
+sweep_C1024_lion_partial.log (kernel death).

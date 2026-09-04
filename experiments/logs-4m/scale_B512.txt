@@ -1,0 +1,5 @@
+B512 c1=512 steps=8000 bpc=1.7381 zero=4.0122
+slots mem_0: 30471 gini=0.991 top1%=0.853
+slots mem_2: 46660 gini=0.984 top1%=0.701
+slots mem_4: 53558 gini=0.980 top1%=0.633
+slots mem_6: 43518 gini=0.985 top1%=0.713

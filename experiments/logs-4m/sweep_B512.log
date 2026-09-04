@@ -1,0 +1,70 @@
+/usr/local/lib/python3.12/site-packages/jax/_src/cloud_tpu_init.py:90: UserWarning: Transparent hugepages are not enabled. TPU runtime startup and shutdown time should be significantly improved on TPU v5e and newer. If not already set, you may need to enable transparent hugepages in your VM image (sudo sh -c "echo always > /sys/kernel/mm/transparent_hugepage/enabled")
+  warnings.warn(
+WARNING: Logging before InitGoogle() is written to STDERR
+E0000 00:00:1788540814.406468    9478 common_lib.cc:648] Could not set metric server port: INVALID_ARGUMENT: Could not find SliceBuilder port 8471 in any of the 0 ports provided in `tpu_process_addresses`="local"
+=== Source Location Trace: ===
+learning/45eac/tfrc/runtime/common_lib.cc:238
+loaded 100,000,000 bytes
+== SCALE arm B512: c1=c2=512 slots/class=1,048,576 steps=8000 BS=256 tokens=131,072,000 ==
+[B512] == arm pool: params 274,611,712 (mem 270,270,464)
+[B512] step     0 loss 5.7555 bpc 8.3034 (121.008s/it)
+[B512] step   250 loss 1.7110 bpc 2.4684 (0.844s/it)
+[B512] CKPT saved at step 499
+[B512] step   500 loss 1.5222 bpc 2.1960 (0.674s/it)
+[B512] step   750 loss 1.4437 bpc 2.0828 (0.569s/it)
+[B512] CKPT saved at step 999
+[B512] step  1000 loss 1.3693 bpc 1.9755 (0.555s/it)
+[B512] step  1250 loss 1.3738 bpc 1.9820 (0.517s/it)
+[B512] CKPT saved at step 1499
+[B512] step  1500 loss 1.3368 bpc 1.9286 (0.518s/it)
+[B512] step  1750 loss 1.2752 bpc 1.8397 (0.496s/it)
+[B512] CKPT saved at step 1999
+[B512] step  2000 loss 1.2799 bpc 1.8464 (0.500s/it)
+[B512] step  2250 loss 1.2677 bpc 1.8289 (0.485s/it)
+[B512] CKPT saved at step 2499
+[B512] step  2500 loss 1.2642 bpc 1.8238 (0.495s/it)
+[B512] step  2750 loss 1.2209 bpc 1.7614 (0.483s/it)
+[B512] CKPT saved at step 2999
+[B512] step  3000 loss 1.2250 bpc 1.7673 (0.603s/it)
+[B512] step  3250 loss 1.2133 bpc 1.7504 (0.584s/it)
+[B512] CKPT saved at step 3499
+[B512] step  3500 loss 1.2374 bpc 1.7852 (0.580s/it)
+[B512] step  3750 loss 1.2084 bpc 1.7433 (0.566s/it)
+[B512] CKPT saved at step 3999
+[B512] step  4000 loss 1.1890 bpc 1.7153 (0.563s/it)
+[B512] step  4250 loss 1.2181 bpc 1.7574 (0.552s/it)
+[B512] CKPT saved at step 4499
+[B512] step  4500 loss 1.2201 bpc 1.7602 (0.571s/it)
+[B512] step  4750 loss 1.1994 bpc 1.7304 (0.560s/it)
+[B512] CKPT saved at step 4999
+[B512] step  5000 loss 1.1924 bpc 1.7202 (0.565s/it)
+[B512] step  5250 loss 1.1759 bpc 1.6965 (0.556s/it)
+[B512] CKPT saved at step 5499
+[B512] step  5500 loss 1.1257 bpc 1.6240 (0.583s/it)
+[B512] step  5750 loss 1.1694 bpc 1.6871 (0.573s/it)
+[B512] CKPT saved at step 5999
+[B512] step  6000 loss 1.1278 bpc 1.6271 (0.594s/it)
+[B512] step  6250 loss 1.1620 bpc 1.6765 (0.585s/it)
+[B512] CKPT saved at step 6499
+[B512] step  6500 loss 1.1499 bpc 1.6590 (0.588s/it)
+[B512] step  6750 loss 1.1702 bpc 1.6883 (0.580s/it)
+[B512] CKPT saved at step 6999
+[B512] step  7000 loss 1.1457 bpc 1.6528 (0.578s/it)
+[B512] step  7250 loss 1.1383 bpc 1.6422 (0.571s/it)
+[B512] CKPT saved at step 7499
+[B512] step  7500 loss 1.1478 bpc 1.6560 (0.569s/it)
+[B512] step  7750 loss 1.1496 bpc 1.6585 (0.563s/it)
+[B512] step  7999 loss 1.1607 bpc 1.6745 (0.557s/it)
+[B512] CKPT saved at step 7999
+[B512] EVAL none       bpc 1.7381
+[B512] EVAL zero       bpc 4.0122
+[B512] RESULT pool: bpc=1.7381 zero=4.0122
+[slots] layer: distinct/total, gini, top1%share
+[slots] mem_0: 30471/1048576 gini=0.991 top1%=0.853
+[slots] mem_2: 46660/1048576 gini=0.984 top1%=0.701
+[slots] mem_4: 53558/1048576 gini=0.980 top1%=0.633
+[slots] mem_6: 43518/1048576 gini=0.985 top1%=0.713
+[B512] slots mem_0: 30471 gini=0.991 top1%=0.853
+[B512] slots mem_2: 46660 gini=0.984 top1%=0.701
+[B512] slots mem_4: 53558 gini=0.980 top1%=0.633
+[B512] slots mem_6: 43518 gini=0.985 top1%=0.713

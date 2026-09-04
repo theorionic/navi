@@ -1,0 +1,20 @@
+/usr/local/lib/python3.12/site-packages/jax/_src/cloud_tpu_init.py:90: UserWarning: Transparent hugepages are not enabled. TPU runtime startup and shutdown time should be significantly improved on TPU v5e and newer. If not already set, you may need to enable transparent hugepages in your VM image (sudo sh -c "echo always > /sys/kernel/mm/transparent_hugepage/enabled")
+  warnings.warn(
+WARNING: Logging before InitGoogle() is written to STDERR
+E0000 00:00:1788546720.149461   12434 common_lib.cc:648] Could not set metric server port: INVALID_ARGUMENT: Could not find SliceBuilder port 8471 in any of the 0 ports provided in `tpu_process_addresses`="local"
+=== Source Location Trace: ===
+learning/45eac/tfrc/runtime/common_lib.cc:238
+loaded 100,000,000 bytes
+== SCALE arm C1024: c1=c2=1024 slots/class=4,194,304 steps=4000 BS=256 tokens=65,536,000 ==
+[C1024] == arm pool: params 1,080,966,656 (mem 1,076,625,408)
+[C1024] step     0 loss 5.7549 bpc 8.3026 (121.637s/it)
+[C1024] step   250 loss 1.7036 bpc 2.4577 (1.215s/it)
+[C1024] CKPT saved at step 499
+[C1024] step   500 loss 1.5208 bpc 2.1941 (1.041s/it)
+[C1024] step   750 loss 1.4387 bpc 2.0756 (0.939s/it)
+Traceback (most recent call last):
+  File "/kaggle/working/experiments/sweep_scale.py", line 118, in <module>
+    main()
+  File "/kaggle/working/experiments/sweep_scale.py", line 98, in main
+    pickle.dump({"params": p, "opt": o, "rng": rng,
+OSError: [Errno 28] No space left on device

@@ -1,0 +1,27 @@
+/usr/local/lib/python3.12/site-packages/jax/_src/cloud_tpu_init.py:90: UserWarning: Transparent hugepages are not enabled. TPU runtime startup and shutdown time should be significantly improved on TPU v5e and newer. If not already set, you may need to enable transparent hugepages in your VM image (sudo sh -c "echo always > /sys/kernel/mm/transparent_hugepage/enabled")
+  warnings.warn(
+WARNING: Logging before InitGoogle() is written to STDERR
+E0000 00:00:1788503077.177879   13301 common_lib.cc:648] Could not set metric server port: INVALID_ARGUMENT: Could not find SliceBuilder port 8471 in any of the 0 ports provided in `tpu_process_addresses`="local"
+=== Source Location Trace: ===
+learning/45eac/tfrc/runtime/common_lib.cc:238
+[S9:H4MID] step     0 loss 7.5546 (46.334s/it)
+[S9:H4MID] step   250 loss 4.9465 (0.318s/it)
+[S9:H4MID] step   500 loss 4.9365 (0.228s/it)
+[S9:H4MID] step   750 loss 5.3417 (0.197s/it)
+[S9:H4MID] step  1000 loss 4.9329 (0.182s/it)
+[S9:H4MID] step  1250 loss 4.9321 (0.173s/it)
+[S9:H4MID] step  1500 loss 4.9314 (0.167s/it)
+[S9:H4MID] step  1750 loss 4.9309 (0.163s/it)
+[S9:H4MID] step  2000 loss 4.9304 (0.160s/it)
+[S9:H4MID] step  2250 loss 4.9301 (0.158s/it)
+[S9:H4MID] step  2500 loss 4.9298 (0.156s/it)
+[S9:H4MID] step  2750 loss 4.9299 (0.155s/it)
+[S9:H4MID] step  3000 loss 4.9296 (0.153s/it)
+[S9:H4MID] step  3250 loss 4.9292 (0.152s/it)
+[S9:H4MID] step  3500 loss 4.9293 (0.152s/it)
+[S9:H4MID] step  3750 loss 4.9292 (0.151s/it)
+[S9:H4MID] step  3999 loss 4.9291 (0.150s/it)
+[S9:H4MID] EVAL none       seen 0.0041  fresh 0.0040
+[S9:H4MID] EVAL zero       seen 0.0002  fresh 0.0002
+[S9:H4MID] EVAL shuffle    seen 0.0002  fresh 0.0002
+== S9:H4MID DONE ==

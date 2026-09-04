@@ -48,6 +48,27 @@ the anchor (500 exposures/fact -> 100%), the failure is in the routing
 *distribution* at 16M-slot scale, not capacity and not raw budget. Cheap next
 levers: staged fact curriculum, cand_k increase, mem_lr_mult sweep.
 
+### 5. Hash-placement fix (v8, 2026-09-04): does NOT rescue 16.8M recall
+Deterministic slot placement (splitmix32 of context token ids mod n_slots,
+uniform 4-row gather, learned w_o readout; CPU mini-test 1024-fact space hit
+19.9% fresh vs 0.39% chance -> mechanism learns). At task scale:
+
+| arm | slots | space | fresh | zeroed |
+|---|---|---|---|---|
+| H4 | 1.048M | 65k (500 exp/fact) | 100% | 83.8% |
+| H4 | 1.048M | 16.8M (2 exp/fact) | 0.40% | 0.03% |
+| H4MID | 16.78M | 16.8M (2 exp/fact) | 0.40% | 0.02% |
+
+Chance = 0.39%. Hash placement = learned placement = chance at 2 exp/fact.
+Sabotage attribution at anchor is weak for hash (83% survives zeroing) —
+with a random 4-of-1M gather the dense path alone reaches ~84% at 65k, so
+hash adds nothing there; at 16.8M nothing learns at this budget, with any
+placement scheme. The binding constraint at 2 exposures/fact is deeper than
+placement: one gradient touch does not write a retrievable value, period.
+The remaining question is whether MORE budget per fact (8-16+ exposures,
+curriculum staged expansion with rehearsal) lets hash placement accumulate —
+the CPU mini-test says the write mechanism works when exposure is adequate.
+
 ## Engineering results (all validated)
 - Slot-sharded jit across 8 cores: P4 0.30s/it, P4MID 1.09s/it, D4 0.022s/it
   (batch 512, 46-1300x over the naive single-device path).
@@ -55,25 +76,27 @@ levers: staged fact curriculum, cand_k increase, mem_lr_mult sweep.
   invalidated all 09-02 runs), rng split (the n2==n1 diagonal collapse).
 - Full reproducibility chain local: experiments/sweep9.py + logs-4m/RESULTS.md.
 
-## Verdict (final)
+## Verdict (final, after v8 hash-placement test)
 The Pool architecture **works mechanically at every scale tested** (sharded
-storage, exact retrieval, sabotage attribution, warm-start carry-over) but
-**closed-book recall does not scale**: 65k facts -> 100%, 1.05M warm-started
--> 0.65% (curriculum does not rescue), 16.8M -> 0.4% at every budget tried
-(2.0 and 4.0 exposures/fact). The curriculum experiment isolates the cause:
-even warm-starting from a 100%-converged Pool, recall collapses the moment
-the fact space expands — so the binding constraint is **acquisition through
-the routing distribution at scale**, not capacity, budget, or warm-start.
-Leading hypothesis: with 1M+ slots, top-k routing spreads probability too
-thinly over candidate slots, so a fact's chosen slots receive too little
-gradient per touch to sharpen keys; the anchor regime (16x headroom, dense
-slot usage) never enters this regime. Dense baseline is equally blind at
-scale, so this is a task-regime property, but the Pool's intended advantage
-remains undemonstrated. Next candidates: hash-based slot placement (bypass
-learned routing for assignment), cand_k/key-lr sweeps, key-sharpness
-diagnostics at S2.
+storage, exact retrieval, sabotage attribution, warm-start carry-over,
+deterministic hash placement) but **closed-book recall at 16.8M facts is
+chance under every intervention tried**: learned placement (2 and 4
+exposures/fact), curriculum warm-start, and hash placement. All acquisition
+routes converge on the same wall: **at ~2-4 gradient touches per fact,
+nothing writes a retrievable value — dense or pooled, learned or hashed.**
+The anchor regime (500 touches/fact) is 100%, the CPU mini-train (adequate
+exposure, 1024-fact space) reaches 20% and climbing on the hash path.
+The scaling law this data supports: recall requires exposures per fact well
+above single digits regardless of placement scheme; capacity and routing are
+NOT the binding constraint at these budgets. The architecture bet (separate,
+shardable, growable knowledge store) is mechanically sound; what remains is a
+training-regime problem: get exposures/fact up (rehearsal curricula, repeat
+sampling, or fact-space staging with consolidation) and the demonstrated
+write-once-read-exact mechanics apply.
 
 ## Reproduction
 - Curriculum: experiments/curriculum.py + chain_v7.sh (S1 cold 65k, S2 warm
   1.05M, S3 warm 16.8M; checkpoints ckpt_C-S*.pkl, logs curv_S*.log).
 - v6 scale test: experiments/s9v6_P4MID.log (8192 steps, 4 exp/fact).
+- v8 hash placement: chain_v8.sh (H4/H4MID 16.8M + H4 anchor; s9v8_*.log);
+  hash impl in navi/pkm.py _hash_path + MemoryConfig.hash_slots.

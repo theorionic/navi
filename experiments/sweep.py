@@ -33,7 +33,8 @@ CFG_MEM_BIG = MemoryConfig(c1=2048, c2=2048, cand_k=8, side_top=64, n_classes=4,
                            score_temp=4.0)
 CFG_MEM_T1 = MemoryConfig(c1=512, c2=512, cand_k=8, side_top=64, n_classes=4,
                           score_temp=1.0)
-
+CFG_HASH = MemoryConfig(c1=512, c2=512, n_classes=4, hash_slots=True, hash_k=4)
+CFG_HASH_MID = MemoryConfig(c1=1024, c2=1024, n_classes=4, hash_slots=True, hash_k=4)
 
 def loss_fn(model, p, b):
     logits = model.apply(p, b[:, :-1], train=True)

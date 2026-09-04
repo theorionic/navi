@@ -97,6 +97,8 @@ if __name__ == "__main__":
         "P4L1": (MODEL, sweep.CFG_MEM_T1, 1.0, ("none",)),
         "P4BIG": (MODEL, sweep.CFG_MEM_BIG, 10.0, ("none", "zero", "shuffle")),
         "P4MID": (MODEL, sweep.CFG_MEM_MID, 10.0, ("none", "zero", "shuffle")),
+        "H4":   (MODEL, sweep.CFG_HASH, 1.0, ("none", "zero", "shuffle")),
+        "H4MID": (MODEL, sweep.CFG_HASH_MID, 1.0, ("none", "zero", "shuffle")),
     }
     if key == "D4":
         from navi.config import ModelConfig as MC

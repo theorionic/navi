@@ -34,7 +34,11 @@ class MemoryConfig:
     value_noise: float = 0.0
     # Sharper readout: softmax(scores * score_temp) over cand_k gathers.
     score_temp: float = 1.0
-
+    # Hash placement: slot candidates = hash(context token IDs) mod n_slots
+    # per position, bypassing learned key routing for WRITES/reads alike.
+    # Deterministic first-touch gradients: no key sharpening needed at scale.
+    hash_slots: bool = False
+    hash_k: int = 4  # hash-derived slots gathered per position per class
 
 @struct.dataclass
 class TrainConfig:

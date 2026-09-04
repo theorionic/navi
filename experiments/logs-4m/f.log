@@ -1,0 +1,37 @@
+/usr/local/lib/python3.12/site-packages/jax/_src/cloud_tpu_init.py:90: UserWarning: Transparent hugepages are not enabled. TPU runtime startup and shutdown time should be significantly improved on TPU v5e and newer. If not already set, you may need to enable transparent hugepages in your VM image (sudo sh -c "echo always > /sys/kernel/mm/transparent_hugepage/enabled")
+  warnings.warn(
+WARNING: Logging before InitGoogle() is written to STDERR
+E0000 00:00:1788298096.070370   43852 common_lib.cc:648] Could not set metric server port: INVALID_ARGUMENT: Could not find SliceBuilder port 8471 in any of the 0 ports provided in `tpu_process_addresses`="local"
+=== Source Location Trace: ===
+learning/45eac/tfrc/runtime/common_lib.cc:238
+[B-joint] step     0 loss 8.9235 (70.495s/it)
+[B-joint] step   300 loss 2.1730 (1.018s/it)
+[B-joint] step   600 loss 2.2365 (0.816s/it)
+[B-joint] step   900 loss 2.1748 (0.748s/it)
+[B-joint] step  1200 loss 2.1448 (0.716s/it)
+[B-joint] step  1500 loss 2.1326 (0.697s/it)
+[B-joint] step  1800 loss 2.1368 (0.686s/it)
+[B-joint] step  2100 loss 2.1376 (0.678s/it)
+[B-joint] step  2400 loss 2.1316 (0.672s/it)
+[B-joint] step  2700 loss 2.1459 (0.669s/it)
+[B-joint] step  3000 loss 2.1168 (0.667s/it)
+[B-joint] step  3300 loss 2.1216 (0.665s/it)
+[B-joint] step  3600 loss 2.1172 (0.664s/it)
+[B-joint] step  3900 loss 2.1228 (0.663s/it)
+[B-joint] step  4200 loss 2.1207 (0.662s/it)
+[B-joint] step  4500 loss 2.1125 (0.661s/it)
+[B-joint] step  4800 loss 2.1168 (0.661s/it)
+[B-joint] step  5100 loss 2.1136 (0.659s/it)
+[B-joint] step  5400 loss 2.1145 (0.657s/it)
+[B-joint] step  5700 loss 2.1154 (0.655s/it)
+[B-joint] step  5999 loss 2.1146 (0.653s/it)
+[B-joint] EVAL none       acc 0.0167
+[B-joint] EVAL zero       acc 0.0160
+[B-joint] EVAL shuffle    acc 0.0160
+[B] joint-scratch none=0.0167 zero=0.0160 shuffle=0.0160
+-- routing probes joint-4m --
+[B-joint] L00 ||w_q||=46.970 ||w_o||=27.948 ||h3||=1.654 ||mem||/||x||=0.7422 slotH=6.49 wH=0.05 distinct=2173 score=+45.82±16.02 repl_err=0.00e+00
+[B-joint] L02 ||w_q||=44.353 ||w_o||=29.488 ||h3||=0.941 ||mem||/||x||=0.4652 slotH=4.79 wH=0.02 distinct=384 score=+81.68±26.26 repl_err=0.00e+00
+[B-joint] L04 ||w_q||=43.443 ||w_o||=34.327 ||h3||=2.916 ||mem||/||x||=4.1360 slotH=4.80 wH=0.01 distinct=352 score=+83.05±26.27 repl_err=0.00e+00
+[B-joint] L06 ||w_q||=49.125 ||w_o||=54.208 ||h3||=4.248 ||mem||/||x||=2.2358 slotH=6.89 wH=0.02 distinct=2969 score=+44.98±12.06 repl_err=0.00e+00
+== FINISH4M DONE ==

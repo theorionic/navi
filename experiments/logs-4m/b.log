@@ -1,0 +1,93 @@
+/usr/local/lib/python3.12/site-packages/jax/_src/cloud_tpu_init.py:90: UserWarning: Transparent hugepages are not enabled. TPU runtime startup and shutdown time should be significantly improved on TPU v5e and newer. If not already set, you may need to enable transparent hugepages in your VM image (sudo sh -c "echo always > /sys/kernel/mm/transparent_hugepage/enabled")
+  warnings.warn(
+WARNING: Logging before InitGoogle() is written to STDERR
+E0000 00:00:1788285825.677305   40370 common_lib.cc:648] Could not set metric server port: INVALID_ARGUMENT: Could not find SliceBuilder port 8471 in any of the 0 ports provided in `tpu_process_addresses`="local"
+=== Source Location Trace: === 
+learning/45eac/tfrc/runtime/common_lib.cc:238
+== Phase B: 4M-fact capacity crossover ==
+
+Note on exposures at 4M facts: 9000 steps x 64 seqs x 16 facts/seq = 9.2M
+fact-slots over 4.19M distinct facts = ~2.3 exposures/fact on average (zipf
+random). Meta needed many more exposures, but dense ceiling at 4M is ~0 and
+pool-only has 268M value params for 4.2M facts (~67 params/fact) — capacity
+is not the binding constraint; routing is. If pool-only learns here, the
+attribution question is answered at crossover scale.
+
+[B-dense] step     0 loss 8.8324 (35.088s/it)
+[B-dense] step   300 loss 2.1781 (0.691s/it)
+[B-dense] step   600 loss 2.1992 (0.589s/it)
+[B-dense] step   900 loss 2.1709 (0.552s/it)
+[B-dense] step  1200 loss 2.1478 (0.535s/it)
+[B-dense] step  1500 loss 2.1326 (0.525s/it)
+[B-dense] step  1800 loss 2.1286 (0.518s/it)
+[B-dense] step  2100 loss 2.1282 (0.513s/it)
+[B-dense] step  2400 loss 2.1328 (0.510s/it)
+[B-dense] step  2700 loss 2.1493 (0.507s/it)
+[B-dense] step  3000 loss 2.1178 (0.504s/it)
+[B-dense] step  3300 loss 2.1211 (0.503s/it)
+[B-dense] step  3600 loss 2.1175 (0.501s/it)
+[B-dense] step  3900 loss 2.1215 (0.500s/it)
+[B-dense] step  4200 loss 2.1202 (0.501s/it)
+[B-dense] step  4500 loss 2.1124 (0.503s/it)
+[B-dense] step  4800 loss 2.1178 (0.504s/it)
+[B-dense] step  5100 loss 2.1142 (0.506s/it)
+[B-dense] step  5400 loss 2.1155 (0.507s/it)
+[B-dense] step  5700 loss 2.1154 (0.508s/it)
+[B-dense] step  5999 loss 2.1144 (0.509s/it)
+[B-dense] EVAL none       acc 0.0161
+[B-poolonly] step     0 loss 8.8919 (71.669s/it)
+[B-poolonly] step   300 loss 2.1521 (1.244s/it)
+[B-poolonly] step   600 loss 2.2029 (1.015s/it)
+[B-poolonly] step   900 loss 2.1798 (0.938s/it)
+[B-poolonly] step  1200 loss 2.1448 (0.902s/it)
+[B-poolonly] step  1500 loss 2.1313 (0.879s/it)
+[B-poolonly] step  1800 loss 2.1358 (0.864s/it)
+[B-poolonly] step  2100 loss 2.1312 (0.853s/it)
+[B-poolonly] step  2400 loss 2.1340 (0.845s/it)
+[B-poolonly] step  2700 loss 2.1483 (0.840s/it)
+[B-poolonly] step  3000 loss 2.1301 (0.835s/it)
+[B-poolonly] step  3300 loss 2.1226 (0.830s/it)
+[B-poolonly] step  3600 loss 2.1207 (0.825s/it)
+[B-poolonly] step  3900 loss 2.1231 (0.821s/it)
+[B-poolonly] step  4200 loss 2.1244 (0.816s/it)
+[B-poolonly] step  4500 loss 2.1140 (0.812s/it)
+[B-poolonly] step  4800 loss 2.1189 (0.808s/it)
+[B-poolonly] step  5100 loss 2.1150 (0.805s/it)
+[B-poolonly] step  5400 loss 2.1157 (0.802s/it)
+[B-poolonly] step  5700 loss 2.1170 (0.799s/it)
+[B-poolonly] step  5999 loss 2.1154 (0.797s/it)
+[B-poolonly] EVAL none       acc 0.0150
+[B-poolonly] EVAL zero       acc 0.0000
+[B-2stage] step     0 loss 10.2389 (52.883s/it)
+[B-2stage] step   300 loss 2.1278 (0.961s/it)
+[B-2stage] step   600 loss 2.1428 (0.791s/it)
+[B-2stage] step   900 loss 2.1485 (0.742s/it)
+[B-2stage] step  1200 loss 2.1322 (0.721s/it)
+[B-2stage] step  1500 loss 2.1183 (0.708s/it)
+[B-2stage] step  1800 loss 2.1194 (0.699s/it)
+[B-2stage] step  2100 loss 2.1249 (0.694s/it)
+[B-2stage] step  2400 loss 2.1244 (0.688s/it)
+[B-2stage] step  2700 loss 2.1358 (0.685s/it)
+[B-2stage] step  3000 loss 2.1138 (0.682s/it)
+[B-2stage] step  3300 loss 2.1191 (0.679s/it)
+[B-2stage] step  3600 loss 2.1122 (0.678s/it)
+[B-2stage] step  3900 loss 2.1202 (0.676s/it)
+[B-2stage] step  4200 loss 2.1173 (0.675s/it)
+[B-2stage] step  4500 loss 2.1115 (0.673s/it)
+[B-2stage] step  4800 loss 2.1159 (0.672s/it)
+[B-2stage] step  5100 loss 2.1136 (0.671s/it)
+[B-2stage] step  5400 loss 2.1144 (0.670s/it)
+[B-2stage] step  5700 loss 2.1147 (0.669s/it)
+[B-2stage] step  5999 loss 2.1138 (0.668s/it)
+[B-2stage] EVAL none       acc 0.0164
+[B-2stage] EVAL zero       acc 0.0070
+Traceback (most recent call last):
+  File "/kaggle/working/batch4m.py", line 373, in <module>
+    phase_b_main()
+  File "/kaggle/working/batch4m.py", line 353, in phase_b_main
+    acc_tsh = evaluate(jm, shuffle_pool(jp, jax.random.PRNGKey(4242)), "B-2stage", "shuffle")
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/kaggle/working/batch4m.py", line 167, in shuffle_pool
+    n, d = v.shape
+    ^^^^
+ValueError: too many values to unpack (expected 2)

@@ -1,0 +1,45 @@
+/usr/local/lib/python3.12/site-packages/jax/_src/cloud_tpu_init.py:90: UserWarning: Transparent hugepages are not enabled. TPU runtime startup and shutdown time should be significantly improved on TPU v5e and newer. If not already set, you may need to enable transparent hugepages in your VM image (sudo sh -c "echo always > /sys/kernel/mm/transparent_hugepage/enabled")
+  warnings.warn(
+WARNING: Logging before InitGoogle() is written to STDERR
+E0000 00:00:1788283091.814747   37968 common_lib.cc:648] Could not set metric server port: INVALID_ARGUMENT: Could not find SliceBuilder port 8471 in any of the 0 ports provided in `tpu_process_addresses`="local"
+=== Source Location Trace: ===
+learning/45eac/tfrc/runtime/common_lib.cc:238
+== Phase A: routing diagnosis at 262k facts ==
+[A-joint] step     0 loss 6.3415 (67.705s/it)
+[A-joint] step   300 loss 1.4409 (1.010s/it)
+[A-joint] step   600 loss 1.4322 (0.809s/it)
+[A-joint] step   900 loss 1.4222 (0.744s/it)
+[A-joint] step  1200 loss 1.4108 (0.710s/it)
+[A-joint] step  1499 loss 1.4082 (0.690s/it)
+[A-joint] EVAL none       acc 0.2575
+[A-joint] EVAL zero       acc 0.2558
+[A] joint none=0.2575 zero=0.2558
+-- routing probes on joint arm --
+[A-joint] L00 ||w_q||=32.231 ||w_o||=23.233 ||h3||=1.259 ||mem||/||x||=0.5302 slotH=6.94 wH=0.52 distinct=3675 score=+16.78±7.88 repl_err=0.00e+00
+[A-joint] L02 ||w_q||=31.810 ||w_o||=23.540 ||h3||=1.238 ||mem||/||x||=0.4949 slotH=5.43 wH=0.22 distinct=796 score=+27.85±9.56 repl_err=0.00e+00
+[A-joint] L04 ||w_q||=31.934 ||w_o||=24.614 ||h3||=1.561 ||mem||/||x||=0.9299 slotH=5.77 wH=0.30 distinct=1153 score=+25.28±8.78 repl_err=0.00e+00
+[A-joint] L06 ||w_q||=33.561 ||w_o||=29.894 ||h3||=2.260 ||mem||/||x||=1.1144 slotH=6.41 wH=0.24 distinct=2534 score=+22.64±7.31 repl_err=0.00e+00
+-- w_o rescale ladder on joint arm --
+[A-joint-rescale] EVAL x0.5       acc 0.2574
+[A-joint-rescale] EVAL x1.0       acc 0.2575
+[A-joint-rescale] EVAL x2.0       acc 0.2555
+[A-joint-rescale] EVAL x4.0       acc 0.2448
+[A-joint-rescale] EVAL x8.0       acc 0.1752
+[A-joint-rescale] EVAL x16.0      acc 0.0865
+[A-poolonly] step     0 loss 6.3740 (61.079s/it)
+[A-poolonly] step   300 loss 1.4558 (1.161s/it)
+[A-poolonly] step   600 loss 1.4335 (0.958s/it)
+[A-poolonly] step   900 loss 1.4221 (0.893s/it)
+[A-poolonly] step  1200 loss 1.4130 (0.858s/it)
+[A-poolonly] step  1499 loss 1.4091 (0.837s/it)
+[A-poolonly] EVAL none       acc 0.2544
+[A] pool-only acc=0.2544
+-- routing probes on pool-only arm --
+[A-poolonly] L00 ||w_q||=36.348 ||w_o||=29.703 ||h3||=1.786 ||mem||/||x||=0.7543 slotH=7.07 wH=0.20 distinct=4207 score=+16.19±4.13 repl_err=0.00e+00
+[A-poolonly] L01 ||w_q||=37.074 ||w_o||=31.544 ||h3||=1.758 ||mem||/||x||=0.7085 slotH=6.90 wH=0.20 distinct=3906 score=+14.42±3.54 repl_err=0.00e+00
+[A-poolonly] L02 ||w_q||=36.337 ||w_o||=32.029 ||h3||=2.043 ||mem||/||x||=0.9179 slotH=6.86 wH=0.11 distinct=3572 score=+14.49±3.34 repl_err=0.00e+00
+[A-poolonly] L03 ||w_q||=34.594 ||w_o||=29.616 ||h3||=1.884 ||mem||/||x||=0.8855 slotH=6.51 wH=0.26 distinct=2691 score=+14.00±3.61 repl_err=0.00e+00
+[A-poolonly] L04 ||w_q||=34.059 ||w_o||=30.963 ||h3||=2.509 ||mem||/||x||=2.0621 slotH=6.57 wH=0.22 distinct=2611 score=+14.26±3.36 repl_err=0.00e+00
+[A-poolonly] L05 ||w_q||=32.256 ||w_o||=29.682 ||h3||=2.721 ||mem||/||x||=2.8078 slotH=5.86 wH=0.31 distinct=1498 score=+20.50±7.12 repl_err=0.00e+00
+[A-poolonly] L06 ||w_q||=32.450 ||w_o||=29.776 ||h3||=2.784 ||mem||/||x||=2.6170 slotH=5.86 wH=0.43 distinct=1662 score=+21.93±9.21 repl_err=0.00e+00
+[A-poolonly] L07 ||w_q||=33.351 ||w_o||=31.773 ||h3||=3.811 ||mem||/||x||=2.2106 slotH=5.98 wH=0.26 distinct=2055 score=+25.44±6.27 repl_err=0.00e+00

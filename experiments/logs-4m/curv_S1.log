@@ -1,0 +1,26 @@
+/usr/local/lib/python3.12/site-packages/jax/_src/cloud_tpu_init.py:90: UserWarning: Transparent hugepages are not enabled. TPU runtime startup and shutdown time should be significantly improved on TPU v5e and newer. If not already set, you may need to enable transparent hugepages in your VM image (sudo sh -c "echo always > /sys/kernel/mm/transparent_hugepage/enabled")
+  warnings.warn(
+WARNING: Logging before InitGoogle() is written to STDERR
+E0000 00:00:1788496797.394870    3928 common_lib.cc:648] Could not set metric server port: INVALID_ARGUMENT: Could not find SliceBuilder port 8471 in any of the 0 ports provided in `tpu_process_addresses`="local"
+=== Source Location Trace: === 
+learning/45eac/tfrc/runtime/common_lib.cc:238
+[C-S1] step     0 loss 6.1780 (87.313s/it)
+[C-S1] step   250 loss 3.5613 (0.609s/it)
+[C-S1] step   500 loss 2.8852 (0.437s/it)
+[C-S1] step   750 loss 2.1280 (0.380s/it)
+[C-S1] step  1000 loss 2.1187 (0.352s/it)
+[C-S1] step  1250 loss 2.1160 (0.334s/it)
+[C-S1] step  1500 loss 2.1153 (0.323s/it)
+[C-S1] step  1750 loss 2.1141 (0.314s/it)
+[C-S1] step  2000 loss 2.1136 (0.308s/it)
+[C-S1] step  2250 loss 2.1131 (0.304s/it)
+[C-S1] step  2500 loss 2.1132 (0.300s/it)
+[C-S1] step  2750 loss 2.1127 (0.297s/it)
+[C-S1] step  3000 loss 2.1125 (0.294s/it)
+[C-S1] step  3250 loss 2.1124 (0.292s/it)
+[C-S1] step  3500 loss 2.1124 (0.290s/it)
+[C-S1] step  3750 loss 2.1124 (0.288s/it)
+[C-S1] step  3999 loss 2.1124 (0.287s/it)
+[C-S1] EVAL fresh 1.0000
+[C-S1] EVAL zero-fresh 0.9994
+== C-S1 DONE ==

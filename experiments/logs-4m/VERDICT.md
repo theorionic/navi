@@ -69,6 +69,23 @@ The remaining question is whether MORE budget per fact (8-16+ exposures,
 curriculum staged expansion with rehearsal) lets hash placement accumulate —
 the CPU mini-test says the write mechanism works when exposure is adequate.
 
+### 6. Pool-collapse diagnostics (2026-09-04): NO collapse found
+Ran key/value health checks on all three curriculum checkpoints
+(S1-65k, S2-1M, S3-16M; 4 memory layers each; diagnose_collapse.py):
+
+- **Key tables**: mean|cosine| between random subkey pairs = 0.101-0.102 at
+  every stage, every layer (random-vector baseline ~0.10 for d=64; collapse
+  would push this toward 1.0). Effective rank ~60-62 of 64.
+- **Value tables**: dead-row fraction 0.0000 everywhere, row norms healthy
+  (0.135-0.165), effective rank ~62-64 (full).
+
+Interpretation: the 16.8M failure is NOT key collapse, NOT value death, NOT
+degenerate tables — the parameter spaces stay healthy and full-rank at every
+scale. The tables simply never receive enough task gradient at 2-4
+exposures/fact to organize into a memorizing store; they remain near-init
+healthy noise. This is consistent with the exposure-budget diagnosis and
+rules out the structural-collapse family of explanations.
+
 ## Engineering results (all validated)
 - Slot-sharded jit across 8 cores: P4 0.30s/it, P4MID 1.09s/it, D4 0.022s/it
   (batch 512, 46-1300x over the naive single-device path).

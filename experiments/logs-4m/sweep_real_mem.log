@@ -1,0 +1,20 @@
+/usr/local/lib/python3.12/site-packages/jax/_src/cloud_tpu_init.py:90: UserWarning: Transparent hugepages are not enabled. TPU runtime startup and shutdown time should be significantly improved on TPU v5e and newer. If not already set, you may need to enable transparent hugepages in your VM image (sudo sh -c "echo always > /sys/kernel/mm/transparent_hugepage/enabled")
+  warnings.warn(
+WARNING: Logging before InitGoogle() is written to STDERR
+E0000 00:00:1788516678.506336    2701 common_lib.cc:648] Could not set metric server port: INVALID_ARGUMENT: Could not find SliceBuilder port 8471 in any of the 0 ports provided in `tpu_process_addresses`="local"
+=== Source Location Trace: ===
+learning/45eac/tfrc/runtime/common_lib.cc:238
+loaded 100,000,000 bytes
+== real-data sweep: enwik8 train 90,000,000 bytes, val 10,000,000 bytes, BS=512 SEQ=64 STEPS=8000 cores=8 ==
+[MREAL] == arm pool: params 274,611,712 (mem 270,270,464)
+[MREAL] step     0 loss 5.7214 bpc 8.2542 (104.187s/it)
+[MREAL] step   250 loss 1.7181 bpc 2.4787 (2.534s/it)
+[MREAL] CKPT saved at step 499
+[MREAL] step   500 loss 1.5274 bpc 2.2036 (2.343s/it)
+[MREAL] step   750 loss 1.4387 bpc 2.0757 (2.272s/it)
+[MREAL] CKPT saved at step 999
+[MREAL] step  1000 loss 1.3683 bpc 1.9741 (2.245s/it)
+[MREAL] step  1250 loss 1.3721 bpc 1.9795 (2.221s/it)
+[MREAL] CKPT saved at step 1499
+[MREAL] step  1500 loss 1.3330 bpc 1.9231 (2.212s/it)
+[MREAL] step  1750 loss 1.2767 bpc 1.8419 (2.200s/it)

@@ -1,0 +1,74 @@
+/usr/local/lib/python3.12/site-packages/jax/_src/cloud_tpu_init.py:90: UserWarning: Transparent hugepages are not enabled. TPU runtime startup and shutdown time should be significantly improved on TPU v5e and newer. If not already set, you may need to enable transparent hugepages in your VM image (sudo sh -c "echo always > /sys/kernel/mm/transparent_hugepage/enabled")
+  warnings.warn(
+WARNING: Logging before InitGoogle() is written to STDERR
+E0000 00:00:1788508395.115750     449 common_lib.cc:648] Could not set metric server port: INVALID_ARGUMENT: Could not find SliceBuilder port 8471 in any of the 0 ports provided in `tpu_process_addresses`="local"
+=== Source Location Trace: === 
+learning/45eac/tfrc/runtime/common_lib.cc:238
+loaded 100,000,000 bytes
+== real-data sweep: enwik8 train 90,000,000 bytes, val 10,000,000 bytes, BS=512 SEQ=64 STEPS=4000 cores=8 ==
+[DREAL] == arm dense: params 6,443,520 (mem 0)
+[DREAL] step     0 loss 5.6309 bpc 8.1237 (28.694s/it)
+[DREAL] step   250 loss 1.7143 bpc 2.4732 (0.152s/it)
+[DREAL] step   500 loss 1.4837 bpc 2.1406 (0.095s/it)
+[DREAL] step   750 loss 1.3944 bpc 2.0116 (0.076s/it)
+[DREAL] step  1000 loss 1.3430 bpc 1.9375 (0.066s/it)
+[DREAL] step  1250 loss 1.3522 bpc 1.9508 (0.060s/it)
+[DREAL] step  1500 loss 1.2979 bpc 1.8724 (0.056s/it)
+[DREAL] step  1750 loss 1.2731 bpc 1.8366 (0.054s/it)
+[DREAL] step  2000 loss 1.2737 bpc 1.8375 (0.052s/it)
+[DREAL] step  2250 loss 1.2514 bpc 1.8054 (0.050s/it)
+[DREAL] step  2500 loss 1.2351 bpc 1.7819 (0.049s/it)
+[DREAL] step  2750 loss 1.2033 bpc 1.7360 (0.048s/it)
+[DREAL] step  3000 loss 1.2036 bpc 1.7364 (0.047s/it)
+[DREAL] step  3250 loss 1.2132 bpc 1.7502 (0.046s/it)
+[DREAL] step  3500 loss 1.2162 bpc 1.7546 (0.045s/it)
+[DREAL] step  3750 loss 1.1820 bpc 1.7053 (0.045s/it)
+[DREAL] step  3999 loss 1.2119 bpc 1.7485 (0.044s/it)
+[DREAL] EVAL none       bpc 1.7898
+[DREAL] RESULT dense: bpc=1.7898
+[MREAL] == arm pool: params 274,611,712 (mem 270,270,464)
+[MREAL] step     0 loss 5.7214 bpc 8.2542 (98.100s/it)
+[MREAL] step   250 loss 1.7207 bpc 2.4824 (2.505s/it)
+[MREAL] step   500 loss 1.5208 bpc 2.1941 (2.315s/it)
+[MREAL] step   750 loss 1.4329 bpc 2.0672 (2.251s/it)
+[MREAL] step  1000 loss 1.3638 bpc 1.9676 (2.219s/it)
+[MREAL] step  1250 loss 1.3628 bpc 1.9661 (2.200s/it)
+[MREAL] step  1500 loss 1.3232 bpc 1.9089 (2.188s/it)
+[MREAL] step  1750 loss 1.2647 bpc 1.8246 (2.179s/it)
+[MREAL] step  2000 loss 1.2660 bpc 1.8265 (2.172s/it)
+[MREAL] step  2250 loss 1.2469 bpc 1.7989 (2.167s/it)
+[MREAL] step  2500 loss 1.2404 bpc 1.7895 (2.162s/it)
+[MREAL] step  2750 loss 1.2041 bpc 1.7372 (2.159s/it)
+[MREAL] step  3000 loss 1.2014 bpc 1.7333 (2.156s/it)
+[MREAL] step  3250 loss 1.1977 bpc 1.7279 (2.154s/it)
+[MREAL] step  3500 loss 1.2250 bpc 1.7673 (2.152s/it)
+[MREAL] step  3750 loss 1.1925 bpc 1.7205 (2.150s/it)
+https://symbolize.stripped_domain/r/?trace=7bb9f59cc7b9,7bb9f58fddef,7bb9ed9c80a6,7bb9ed9c81bd,7bb9ed9c876c,7bb9ed9c8a98,7bb9ed9cae93,7bb9e9aa2a4e,7bb9e99df321,7bb9e99dee0f,7bb9e99fad3c,7bb9e99fac4e,7bb9e9c38c0f,7bb9f5cc6f0b,7bb9f5cb0ffa,7bb9f5cd2f54,7bb9f5cc9fbc,7bb9f5ca704c,7bb9f5cb1bc2,7bb9f5ce9825,7bb9f5cc6f0b,7bb9e57ab93e,7fff5ecd8e6f&map= 
+*** SIGTERM received by PID 449 (TID 449) on cpu 35 from PID 2696; stack trace: ***
+PC: @     0x7bb9f59cc7b9  (unknown)  syscall
+    @     0x7bb936db47e5       1904  (unknown)
+    @     0x7bb9f58fddf0  555993056  (unknown)
+    @     0x7bb9ed9c80a7         48  absl::lts_20260526::synchronization_internal::FutexWaiter::Wait()
+    @     0x7bb9ed9c81be         32  AbslInternalPerThreadSemWait_lts_20260526
+    @     0x7bb9ed9c876d         48  absl::lts_20260526::Mutex::Block()
+    @     0x7bb9ed9c8a99        128  absl::lts_20260526::Mutex::LockSlowWithDeadline()
+    @     0x7bb9ed9cae94         96  absl::lts_20260526::Notification::WaitForNotificationWithTimeout()
+    @     0x7bb9e9aa2a4f        112  jax::BlockUntilReadyWithCancel()
+    @     0x7bb9e99df322        256  jax::PyHostValue::AsNumPyArray()
+    @     0x7bb9e99dee10         96  jax::PyArray::SingleDeviceArrayToNumpyArrayDidCopy()
+    @     0x7bb9e99fad3d         64  xla::ValueOrThrowWrapper<>::operator()()
+    @     0x7bb9e99fac4f         64  nanobind::detail::func_create<>()::{lambda()#1}::__invoke()
+    @     0x7bb9e9c38c10        144  nanobind::detail::nb_func_vectorcall_simple_1()
+    @     0x7bb9f5cc6f0c         64  PyObject_Vectorcall
+    @     0x7bb9f5cb0ffb        464  _PyEval_EvalFrameDefault
+    @     0x7bb9f5cd2f55         64  PyObject_CallOneArg
+    @     0x7bb9f5cc9fbd         96  _PyObject_GenericGetAttrWithDict
+    @     0x7bb9f5ca704d         48  PyObject_GetAttr
+    @     0x7bb9f5cb1bc3        464  _PyEval_EvalFrameDefault
+    @     0x7bb9f5ce9826        160  method_vectorcall
+    @     0x7bb9f5cc6f0c         64  PyObject_Vectorcall
+    @     0x7bb9e57ab93f        264  PyArray_FromArrayAttr_int
+    @     0x7fff5ecd8e70  (unknown)  (unknown)
+https://symbolize.stripped_domain/r/?trace=7bb9f59cc7b9,7bb936db47e4,7bb9f58fddef,7bb9ed9c80a6,7bb9ed9c81bd,7bb9ed9c876c,7bb9ed9c8a98,7bb9ed9cae93,7bb9e9aa2a4e,7bb9e99df321,7bb9e99dee0f,7bb9e99fad3c,7bb9e99fac4e,7bb9e9c38c0f,7bb9f5cc6f0b,7bb9f5cb0ffa,7bb9f5cd2f54,7bb9f5cc9fbc,7bb9f5ca704c,7bb9f5cb1bc2,7bb9f5ce9825,7bb9f5cc6f0b,7bb9e57ab93e,7fff5ecd8e6f&map= 
+E0904 10:11:06.878323     449 coredump_hook.cc:247] RAW: Remote crash gathering disabled for SIGTERM.
+E0904 10:11:07.077793     449 process_state.cc:808] RAW: Raising signal 15 with default behavior

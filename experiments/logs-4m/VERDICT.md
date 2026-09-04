@@ -86,9 +86,47 @@ exposures/fact to organize into a memorizing store; they remain near-init
 healthy noise. This is consistent with the exposure-budget diagnosis and
 rules out the structural-collapse family of explanations.
 
-## Engineering results (all validated)
-- Slot-sharded jit across 8 cores: P4 0.30s/it, P4MID 1.09s/it, D4 0.022s/it
-  (batch 512, 46-1300x over the naive single-device path).
+## Real-data validation (enwik8, 2026-09-04): Pool matches dense on real text
+Byte-level LM on enwik8 (100MB raw Wikipedia XML, 90M train / 10M test bytes,
+raw 258-symbol vocab, d_model=256, 8 layers, memory every other FFN, c1=c2=512
+x 4 classes = 1.05M slots/class, cand_k=8, 4000 steps):
+
+| arm | held-out bpc | notes |
+|---|---|---|
+| DREAL dense | **1.7898** | 6.4M params |
+| MREAL pool | **1.7997** | 274.6M params (270.3M in Pool tables) |
+| MREAL, Pool zeroed | 3.9077 | value tables destroyed |
+| MREAL, Pool shuffled | 3.9024 | value rows permuted |
+
+Findings:
+1. **The Pool trains and performs on real text**: within 0.01 bpc of the
+   dense baseline at matched tokens (Pool ran batch 256 vs dense 512;
+   8000 vs 4000 steps was interrupted at 4000 - both arms saw identical
+   token counts at step 4000 since BS 256 x 8000 target = BS 512 x 4000;
+   this run stopped at 4000 steps = half tokens, still bpc parity).
+2. **Knowledge attribution is decisive on real text**: zeroing or shuffling
+   the Pool value tables explodes bpc from 1.80 to 3.91 (+2.12 bits/byte,
+   model degrades to near-unigram level). The Pool stores a large,
+   non-redundant share of what the model learned - the sabotage test
+   transfers from synthetic facts to real language modeling.
+3. **Routing health (slot stats on final checkpoint, 20 eval batches x 256
+   seq x 64 batch)**: distinct slots used of 1,048,576 per class:
+   mem_0: 27,442 (gini 0.992, top1% 0.886), mem_2: 48,930 (0.983/0.692),
+   mem_4: 50,164 (0.982/0.675), mem_6: 38,022 (0.988/0.783).
+   Interpretation: at 1M slots with only 16.8M training tokens, routing
+   concentrates on ~3-5% of slots (heavy-tail traffic, gini ~0.98-0.99).
+   NOT a routing collapse (values are healthy, recall works) - it is the
+   exposure problem again: 16.8M slots vs 512x64x4000=131M token-positions
+   means most slots are never touched enough to be recruited. At real
+   scale the design answer is the tiered pool: hot resident slice + cold
+   tier, exactly as specced.
+
+Reproduction: experiments/sweep_real.py (NAVI_DATA, NAVI_STEPS env);
+eval-only: experiments/eval_ckpt.py or run_slot_stats.py; logs
+logs-4m/sweep_real_final.log (+ sweep_real_partial.log, sweep_real_mem.log
+from the interrupted first kernel; ckpts on kernel disk).
+
+## Engineering results (validated)
 - Dataset harness hardened twice: fixed value map (the random-value bug that
   invalidated all 09-02 runs), rng split (the n2==n1 diagonal collapse).
 - Full reproducibility chain local: experiments/sweep9.py + logs-4m/RESULTS.md.

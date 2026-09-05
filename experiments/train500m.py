@@ -80,9 +80,11 @@ def generate_step(model, params, ids, pos):
     return logits[:, pos, :]
 
 
-def generate(model, params, prompt_bytes: bytes, n_tokens: int, temp=0.8) -> str:
+def generate(model, params, prompt_bytes: bytes, n_tokens: int, temp=0.8, rng=None) -> str:
     """Greedy-ish sampling decode from byte-level model. Params are sharded;
     apply handles replication internally for inference."""
+    if rng is None:
+        rng = jax.random.PRNGKey(0)
     ids = [BOS] + list(prompt_bytes)
     out = []
     buf = np.zeros((1, SEQ), dtype=np.int32)
@@ -95,8 +97,15 @@ def generate(model, params, prompt_bytes: bytes, n_tokens: int, temp=0.8) -> str
             buf[0, :] = ids[-SEQ:]
             pos = SEQ - 1
         logits = generate_step(model, params, jnp.asarray(buf), jnp.int32(pos))
-        logits = logits / temp
-        nxt = int(jax.random.categorical(jax.random.PRNGKey(len(ids)), logits)[0])
+        # ponytail: mask BOS and reserved tokens so only valid bytes (0-255) and EOS can be sampled
+        logits = logits.at[0, BOS].set(-1e9)
+        if logits.shape[-1] > 258:
+            logits = logits.at[0, 258:].set(-1e9)
+        rng, subkey = jax.random.split(rng)
+        if temp <= 0:
+            nxt = int(jnp.argmax(logits[0]))
+        else:
+            nxt = int(jax.random.categorical(subkey, logits / temp)[0])
         if nxt == EOS:
             break
         out.append(nxt)
@@ -109,9 +118,11 @@ PROMPTS = [b"The", b"Once upon a time", b"In 2026, the president of", b"Water is
 
 def do_generation(model, params, step_i):
     print(f"[{TAG}] ---- GENERATION @ step {step_i} ----", flush=True)
+    rng = jax.random.PRNGKey(step_i + 42)
     for pr in PROMPTS:
-        txt = generate(model, params, pr, GEN_LEN)
-        one = txt.replace("\n", " ")
+        rng, subkey = jax.random.split(rng)
+        txt = generate(model, params, pr, GEN_LEN, rng=subkey)
+        one = txt.replace("\r", " ").replace("\n", " ")
         print(f"[{TAG}] GEN {pr.decode()!r} -> {one[:300]}", flush=True)
     print(f"[{TAG}] ---- END GEN ----", flush=True)
 

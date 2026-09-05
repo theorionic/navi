@@ -1,0 +1,46 @@
+/usr/local/lib/python3.12/site-packages/jax/_src/cloud_tpu_init.py:90: UserWarning: Transparent hugepages are not enabled. TPU runtime startup and shutdown time should be significantly improved on TPU v5e and newer. If not already set, you may need to enable transparent hugepages in your VM image (sudo sh -c "echo always > /sys/kernel/mm/transparent_hugepage/enabled")
+  warnings.warn(
+WARNING: Logging before InitGoogle() is written to STDERR
+E0000 00:00:1788568468.336289     474 common_lib.cc:648] Could not set metric server port: INVALID_ARGUMENT: Could not find SliceBuilder port 8471 in any of the 0 ports provided in `tpu_process_addresses`="local"
+=== Source Location Trace: ===
+learning/45eac/tfrc/runtime/common_lib.cc:238
+loaded 100,000,000 bytes
+== SCALE arm C1024: c1=c2=1024 slots/class=4,194,304 steps=4000 BS=256 tokens=65,536,000 ==
+[C1024] == arm pool: params 1,080,966,656 (mem 1,076,625,408)
+[C1024] step     0 loss 4.6964 bpc 6.7755 (112.759s/it)
+[C1024] step   250 loss 2.2162 bpc 3.1973 (1.184s/it)
+[C1024] CKPT saved at step 499
+[C1024] step   500 loss 1.7839 bpc 2.5737 (0.984s/it)
+[C1024] step   750 loss 1.5476 bpc 2.2328 (0.907s/it)
+[C1024] CKPT saved at step 999
+[C1024] step  1000 loss 1.4542 bpc 2.0979 (0.881s/it)
+[C1024] step  1250 loss 1.4362 bpc 2.0720 (0.853s/it)
+[C1024] CKPT saved at step 1499
+[C1024] step  1500 loss 1.3940 bpc 2.0112 (0.846s/it)
+[C1024] step  1750 loss 1.3202 bpc 1.9046 (0.829s/it)
+[C1024] CKPT saved at step 1999
+[C1024] step  2000 loss 1.3124 bpc 1.8934 (0.822s/it)
+[C1024] step  2250 loss 1.2997 bpc 1.8751 (0.812s/it)
+[C1024] CKPT saved at step 2499
+[C1024] step  2500 loss 1.2993 bpc 1.8744 (0.827s/it)
+[C1024] step  2750 loss 1.2556 bpc 1.8114 (0.818s/it)
+[C1024] CKPT saved at step 2999
+[C1024] step  3000 loss 1.2610 bpc 1.8193 (0.814s/it)
+[C1024] step  3250 loss 1.2492 bpc 1.8022 (0.807s/it)
+[C1024] CKPT saved at step 3499
+[C1024] step  3500 loss 1.2809 bpc 1.8479 (0.859s/it)
+[C1024] step  3750 loss 1.2367 bpc 1.7842 (0.851s/it)
+[C1024] step  3999 loss 1.2689 bpc 1.8306 (0.843s/it)
+[C1024] CKPT saved at step 3999
+[C1024] EVAL none       bpc 1.9151
+[C1024] EVAL zero       bpc 2.8014
+[C1024] RESULT pool: bpc=1.9151 zero=2.8014
+[slots] layer: distinct/total, gini, top1%share
+[slots] mem_0: 21027/4194304 gini=0.999 top1%=1.000
+[slots] mem_2: 32739/4194304 gini=0.998 top1%=1.000
+[slots] mem_4: 53488/4194304 gini=0.996 top1%=0.978
+[slots] mem_6: 54652/4194304 gini=0.996 top1%=0.976
+[C1024] slots mem_0: 21027 gini=0.999 top1%=1.000
+[C1024] slots mem_2: 32739 gini=0.998 top1%=1.000
+[C1024] slots mem_4: 53488 gini=0.996 top1%=0.978
+[C1024] slots mem_6: 54652 gini=0.996 top1%=0.976

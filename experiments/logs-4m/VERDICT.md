@@ -177,3 +177,24 @@ Infra lessons banked in sweep_scale.py: slot-sharded values, Lion,
 params-only ckpts in ~/experiments, NAVI_RESUME=1 gate.
 Logs: logs-4m/sweep_B512.log (complete), scale_B512.txt,
 sweep_C1024_lion_partial.log (kernel death).
+
+**Sweep A result (2026-09-05, C1024 completed):** 4.19M slots/class
+(1.08B params), same 66M tokens as the 1.05M-slot arm: held-out
+bpc **1.9151** vs 1.7997 (4x slots, WORSE at equal tokens), zero-sabotage
+2.8014 (gap 0.89 bits vs 2.11). Slot exposure collapsed further:
+21-55k distinct slots of 4.19M (0.5-1.3%, gini 0.998-0.999, top1% ~100%).
+
+**Capacity answer at this token budget: MORE SLOTS = WORSE.** With only
+66M token-positions, quadrupling slots quarters the exposures/slot;
+recruitment collapses (0.5% of slots touched, one slot per layer taking
+~100% of traffic). This is the exposure wall of VERDICT §4-5 reproduced
+on real text and at 1B params: **slot capacity only pays once tokens
+scale with it.** Combined with Sweep B (2x tokens -> bpc 1.7381, gap
+2.27), the two-point curve says: knowledge-per-byte improves when
+exposures/slot stay above the recruitment threshold; the Pool is not
+capacity-limited at 1M slots, it is exposure-limited at this budget.
+
+C2048 (16.8M slots/class, 17.2GB values) blocked: XLA replicates the
+full table on the slot-axis gather (index crosses shards) -> 8GB/core
+OOM. Needs per-core routing (Meta's design) - an engineering change,
+not a config; deferred.

@@ -16,6 +16,7 @@ NAVI_SEQ (512), NAVI_RESUME=1 to resume from ckpt_500m.pkl.
 """
 import sys
 sys.path.insert(0, "/kaggle/working")
+from functools import partial
 import os
 import pickle
 import time
@@ -72,7 +73,8 @@ def make_tx(params):
     return optax.multi_transform({"core": core, "mem": mem}, labels)
 
 
-@jax.jit
+# ponytail: mark model as static since it's a Flax Module, not a JAX array
+@partial(jax.jit, static_argnames=["model"])
 def generate_step(model, params, ids):
     logits = model.apply(params, ids[:, -SEQ:], train=False)
     return logits[:, -1, :]

@@ -42,11 +42,11 @@ def candidate_recall():
         exact = exact_topk_slots(q1, q2, k1, k2, cfg)
         s1 = jnp.einsum("cd,ckd->ck", q1, k1)
         s2 = jnp.einsum("cd,ckd->ck", q2, k2)
-        i1 = jnp.top_k(s1, cfg.side_top)[1]
-        i2 = jnp.top_k(s2, cfg.side_top)[1]
+        i1 = jax.lax.top_k(s1, cfg.side_top)[1]
+        i2 = jax.lax.top_k(s2, cfg.side_top)[1]
         sub = jnp.take_along_axis(s1, i1, -1)[..., :, None] + jnp.take_along_axis(s2, i2, -1)[..., None, :]
         side = sub.shape[-2]
-        got = jnp.top_k(sub.reshape(cfg.n_classes, side * side), cfg.cand_k)[1]
+        got = jax.lax.top_k(sub.reshape(cfg.n_classes, side * side), cfg.cand_k)[1]
         r, c = got // side, got % side
         got_slots = jnp.take_along_axis(i1, r, -1) * cfg.c2 + jnp.take_along_axis(i2, c, -1)
         recalls.append(float(jnp.isin(got_slots, exact).mean()))

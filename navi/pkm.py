@@ -65,14 +65,15 @@ class ProductKeyMemory(nn.Module):
         s2 = jnp.einsum("blcd,ckd->blck", q2, self.k2)
         # two-sided filter; with side_top=16 the side^2 grid is ~134MB at
         # b=512 - fully vectorized, no chunk loop, no scan.
-        i1 = jnp.top_k(s1, c.side_top, axis=-1)[1]
-        i2 = jnp.top_k(s2, c.side_top, axis=-1)[1]
+        # ponytail: jax.lax.top_k operates on the last axis
+        i1 = jax.lax.top_k(s1, c.side_top)[1]
+        i2 = jax.lax.top_k(s2, c.side_top)[1]
         g1 = jnp.take_along_axis(s1, i1, axis=-1)
         g2 = jnp.take_along_axis(s2, i2, axis=-1)
         sub = g1[..., :, None] + g2[..., None, :]  # (b, l, classes, side, side)
         side = sub.shape[-2]
         flat = sub.reshape(b, l, c.n_classes, side * side)
-        f_idx = jnp.top_k(flat, c.cand_k, axis=-1)[1]
+        f_idx = jax.lax.top_k(flat, c.cand_k)[1]
         r, col = f_idx // side, f_idx % side
         pi1 = jnp.take_along_axis(i1, r, axis=-1)
         pi2 = jnp.take_along_axis(i2, col, axis=-1)
@@ -132,4 +133,4 @@ def exact_topk_slots(
     s2 = jnp.einsum("cd,ckd->ck", q2, k2)
     grid = s1[..., :, None] + s2[..., None, :]
     grid = grid.reshape(grid.shape[0], -1)
-    return jnp.top_k(grid, cfg.cand_k)[1]
+    return jax.lax.top_k(grid, cfg.cand_k)[1]

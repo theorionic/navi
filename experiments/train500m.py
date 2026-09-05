@@ -73,18 +73,28 @@ def make_tx(params):
     return optax.multi_transform({"core": core, "mem": mem}, labels)
 
 
-# ponytail: mark model as static since it's a Flax Module, not a JAX array
+# ponytail: mark model as static; keep input shape fixed to (1, SEQ) with pos to avoid recompiling every token
 @partial(jax.jit, static_argnames=["model"])
-def generate_step(model, params, ids):
-    logits = model.apply(params, ids[:, -SEQ:], train=False)
-    return logits[:, -1, :]
+def generate_step(model, params, ids, pos):
+    logits = model.apply(params, ids, train=False)
+    return logits[:, pos, :]
+
+
 def generate(model, params, prompt_bytes: bytes, n_tokens: int, temp=0.8) -> str:
     """Greedy-ish sampling decode from byte-level model. Params are sharded;
     apply handles replication internally for inference."""
     ids = [BOS] + list(prompt_bytes)
     out = []
+    buf = np.zeros((1, SEQ), dtype=np.int32)
     for _ in range(n_tokens):
-        logits = generate_step(model, params, jnp.array([ids[-SEQ:]], dtype=jnp.int32))
+        buf.fill(0)
+        if len(ids) <= SEQ:
+            buf[0, :len(ids)] = ids
+            pos = len(ids) - 1
+        else:
+            buf[0, :] = ids[-SEQ:]
+            pos = SEQ - 1
+        logits = generate_step(model, params, jnp.asarray(buf), jnp.int32(pos))
         logits = logits / temp
         nxt = int(jax.random.categorical(jax.random.PRNGKey(len(ids)), logits)[0])
         if nxt == EOS:

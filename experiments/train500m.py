@@ -176,14 +176,21 @@ def main():
         u, oo2 = tx.update(g, oo, pp)
         return optax.apply_updates(pp, u), oo2
 
-    ckpt_path = os.path.expanduser("~/experiments/ckpt_500m.pkl")
-    os.makedirs(os.path.dirname(ckpt_path), exist_ok=True)
+    # checkpoints live in /kaggle/working (persists on notebook commit);
+    # keep only the latest NAVI_KEEP_CKPT (default 3) to bound disk use
+    ckpt_dir = "/kaggle/working/experiments"
+    os.makedirs(ckpt_dir, exist_ok=True)
+    keep = int(os.environ.get("NAVI_KEEP_CKPT", "3"))
     start = 0
-    if os.path.exists(ckpt_path) and os.environ.get("NAVI_RESUME") == "1":
-        with open(ckpt_path, "rb") as f:
-            st = pickle.load(f)
-        p, o, start = st["params"], st["opt"], st["step"] + 1
-        print(f"[{TAG}] RESUMED at step {start}", flush=True)
+    ckpt_path = None
+    if os.environ.get("NAVI_RESUME") == "1":
+        ckpts = sorted(f for f in os.listdir(ckpt_dir) if f.startswith("ckpt_500m_step") and f.endswith(".pkl"))
+        if ckpts:
+            ckpt_path = os.path.join(ckpt_dir, ckpts[-1])
+            with open(ckpt_path, "rb") as f:
+                st = pickle.load(f)
+            p, o, start = st["params"], st["opt"], st["step"] + 1
+            print(f"[{TAG}] RESUMED from {ckpt_path} at step {start}", flush=True)
 
     t0 = time.time()
     losses = []
@@ -202,11 +209,20 @@ def main():
         if i % GEN_EVERY == 0 or i == STEPS - 1:
             do_generation(model, p, i)
         if i % 500 == 499 or i == STEPS - 1:
-            with open(ckpt_path + ".tmp", "wb") as f:
+            ck = os.path.join(ckpt_dir, f"ckpt_500m_step{i:06d}.pkl")
+            with open(ck + ".tmp", "wb") as f:
                 pickle.dump({"params": p, "opt": o, "rng": None, "step": i,
                              "losses": losses}, f)
-            os.replace(ckpt_path + ".tmp", ckpt_path)
-            print(f"[{TAG}] CKPT saved at step {i}", flush=True)
+            os.replace(ck + ".tmp", ck)  # atomic on same fs
+            # rotate: newest NAVI_KEEP_CKPT survive
+            old = sorted(f for f in os.listdir(ckpt_dir)
+                         if f.startswith("ckpt_500m_step") and f.endswith(".pkl"))
+            for f in old[:-keep] if len(old) > keep else []:
+                try:
+                    os.remove(os.path.join(ckpt_dir, f))
+                except OSError:
+                    pass
+            print(f"[{TAG}] CKPT saved {ck} (keeping {min(len(old), keep)})", flush=True)
 
     vb = feed.val.array()
     print(f"[{TAG}] VAL bpc {val_loss(model, p, vb):.4f}", flush=True)

@@ -1,0 +1,177 @@
+97.8s	41	[500m] feed ready: buf 267MB val 12007KB
+181.5s	42	[500m] step     0 loss 4.5674 bpc 6.5893 (2k tok/s) buf 1024MB
+181.5s	43	[500m] ---- GENERATION @ step 0 ----
+195.3s	44	[500m] GEN 'The' -> e   e e     ee       e    e  a                o                   e  e      c ,    e' t    i      i       o      e  i                 ee     Y              o      o       e     o e a         e    o e o  o     e              o a  t        e e       
+204.7s	45	[500m] GEN 'Once upon a time' ->  eeeeee  eeeee ee   oee  eo e  te  ee e e    e e         e ee ee       " ee         #e e      o   e  e  e             o c     ae         e               n  e                  e       oe      e         eeee eee te  ee   )                          
+214.3s	46	[500m] GEN 'In 2026, the president of' -> e   e ce e   e  e teee ee  eee  ,e   e    ee   e       oe    D e    oe     e        nee     o     e      /e   e       oe   e e   l s     ee       e e           ee ay        pe ae    ee   e  eo           e eo     ee  ee         e   eL   oe       
+223.7s	47	[500m] GEN 'Water is' -> roee ee ee  oeeeeee  ee  rre   :e    e e e   e     e  ,ae    :eee oe   oeo      eo   e     e   o           e     ee     me         e o e        o    o      Fe     e  r             ae             ee e      e    e  e      oe  ee          ee        e 
+223.7s	48	[500m] ---- END GEN ----
+314.0s	49	[500m] step    50 loss 2.7437 bpc 3.9583 (31k tok/s) buf 1024MB
+404.5s	50	[500m] step   100 loss 2.6131 bpc 3.7700 (43k tok/s) buf 1024MB
+494.9s	51	[500m] step   150 loss 2.6028 bpc 3.7550 (50k tok/s) buf 1024MB
+585.4s	52	[500m] step   200 loss 2.6071 bpc 3.7612 (54k tok/s) buf 1024MB
+676.0s	53	[500m] step   250 loss 2.5612 bpc 3.6951 (57k tok/s) buf 1024MB
+766.7s	54	[500m] step   300 loss 2.5735 bpc 3.7128 (59k tok/s) buf 1024MB
+857.1s	55	[500m] step   350 loss 2.5604 bpc 3.6939 (61k tok/s) buf 1024MB
+947.7s	56	[500m] step   400 loss 2.5568 bpc 3.6887 (62k tok/s) buf 1024MB
+1038.1s	57	[500m] step   450 loss 2.5682 bpc 3.7051 (63k tok/s) buf 1024MB
+1130.1s	58	[500m] CKPT saved at step 499
+1134.7s	59	[500m] step   500 loss 2.5615 bpc 3.6955 (63k tok/s) buf 1024MB
+1225.3s	60	[500m] step   550 loss 2.5523 bpc 3.6821 (64k tok/s) buf 1024MB
+1315.7s	61	[500m] step   600 loss 2.5654 bpc 3.7012 (65k tok/s) buf 1024MB
+1406.4s	62	[500m] step   650 loss 2.5624 bpc 3.6967 (65k tok/s) buf 1024MB
+1497.0s	63	[500m] step   700 loss 2.5701 bpc 3.7078 (66k tok/s) buf 1024MB
+1587.5s	64	[500m] step   750 loss 2.5368 bpc 3.6599 (66k tok/s) buf 1024MB
+1677.9s	65	[500m] step   800 loss 2.5436 bpc 3.6696 (66k tok/s) buf 1024MB
+1768.3s	66	[500m] step   850 loss 2.5338 bpc 3.6555 (67k tok/s) buf 1024MB
+1858.8s	67	[500m] step   900 loss 2.5349 bpc 3.6571 (67k tok/s) buf 1024MB
+1949.3s	68	[500m] step   950 loss 2.5400 bpc 3.6645 (67k tok/s) buf 1024MB
+2045.9s	69	[500m] CKPT saved at step 999
+2050.5s	70	[500m] step  1000 loss 2.5142 bpc 3.6272 (67k tok/s) buf 1024MB
+2050.5s	71	[500m] ---- GENERATION @ step 1000 ----
+2059.9s	72	[500m] GEN 'The' -> nide arofimict amischinkis t oug munuering a plocar iond anichriff clend (n f D Co ANainty G pentht Son t Cobes P: Yelin). hilissto bl itis boup isprlie lomamppor outhe ale wang henlof on by t to aks. Civpofo ithe Paur van arecongupoo In ache oale rt an y 
+2069.5s	73	[500m] GEN 'Once upon a time' -> yon ty finl-enve o dande he “Re [te t wiferel Ghang athe iortso atica tzyerine on s f areng the tho toff wathaund o bor me y. Theaprou tin ” Jin La Mokiarotee s we d I alo hierchio trs g the canth fe, me within der s of abecoo ansthele. Ithest ave civ
+2079.1s	74	[500m] GEN 'In 2026, the president of' ->  areal onghed hed athing watand ofire ghe tousthe ingh orite e ofushe hesing d mun. B.. PMeve theanhrabope sin t a t ang Se id wofo thire oustisthe alarathailethe of p sarie do trechire mpat. I The n bus e y t ishe p at feacore fiamangerered rereche secto 
+2088.6s	75	[500m] GEN 'Water is' ->  acoffor igreconthaste alat dorathege pe at t cracandecasponauconats tharoraton ab. Thote ttsthecou thinfolle Thas Eg athericat tifred sing the cesiees asthe has. Dedandd t s dd prelasinas it the fred ory n rshisiserto theainct nsisateer ioflive beshariais
+2088.6s	76	[500m] ---- END GEN ----
+2179.2s	77	[500m] step  1050 loss 2.5094 bpc 3.6203 (66k tok/s) buf 1024MB
+2269.7s	78	[500m] step  1100 loss 2.4934 bpc 3.5972 (66k tok/s) buf 1024MB
+2360.2s	79	[500m] step  1150 loss 2.4907 bpc 3.5934 (67k tok/s) buf 1024MB
+2450.7s	80	[500m] step  1200 loss 2.4682 bpc 3.5608 (67k tok/s) buf 1024MB
+2541.1s	81	[500m] step  1250 loss 2.4249 bpc 3.4985 (67k tok/s) buf 1024MB
+2631.6s	82	[500m] step  1300 loss 2.4180 bpc 3.4885 (67k tok/s) buf 1024MB
+2722.0s	83	[500m] step  1350 loss 2.3934 bpc 3.4530 (67k tok/s) buf 1024MB
+2812.5s	84	[500m] step  1400 loss 2.3804 bpc 3.4342 (68k tok/s) buf 1024MB
+2902.9s	85	[500m] step  1450 loss 2.3351 bpc 3.3688 (68k tok/s) buf 1024MB
+2999.8s	86	[500m] CKPT saved at step 1499
+3004.4s	87	[500m] step  1500 loss 2.3000 bpc 3.3181 (68k tok/s) buf 1024MB
+3094.9s	88	[500m] step  1550 loss 2.2777 bpc 3.2861 (68k tok/s) buf 1024MB
+3185.5s	89	[500m] step  1600 loss 2.2425 bpc 3.2352 (68k tok/s) buf 1024MB
+3275.9s	90	[500m] step  1650 loss 2.2314 bpc 3.2192 (68k tok/s) buf 1024MB
+3366.5s	91	[500m] step  1700 loss 2.2451 bpc 3.2391 (68k tok/s) buf 1024MB
+3456.9s	92	[500m] step  1750 loss 2.1823 bpc 3.1484 (68k tok/s) buf 1024MB
+3547.4s	93	[500m] step  1800 loss 2.1774 bpc 3.1413 (68k tok/s) buf 1024MB
+3637.8s	94	[500m] step  1850 loss 2.1870 bpc 3.1552 (69k tok/s) buf 1024MB
+3728.3s	95	[500m] step  1900 loss 2.1590 bpc 3.1148 (69k tok/s) buf 1024MB
+3818.8s	96	[500m] step  1950 loss 2.1652 bpc 3.1237 (69k tok/s) buf 1024MB
+3969.2s	97	[500m] CKPT saved at step 1999
+3973.7s	98	[500m] step  2000 loss 2.1593 bpc 3.1152 (68k tok/s) buf 1024MB
+3973.7s	99	[500m] ---- GENERATION @ step 2000 ----
+3983.4s	100	[500m] GEN 'The' ->  sopersisnan speresing and the prountial in contry bens. The's is the prisisea not simpasily fol the not somes reamatink. Mabustry reather was and waring propess resinctions both neectamer time is abodey the they for could counsenntly tedenention. The rami
+3993.1s	101	[500m] GEN 'Once upon a time' ->  dentes towrd duclentive the whele you will anyou ding worke ther was the private Jayt to mortom to work by and one way wharitie conturidy of the sprorsidity reving if respicess a afell were it pritures. Am ustoomether prech ortoo for portia off dily fusin
+4002.8s	102	[500m] GEN 'In 2026, the president of' -> land the he ir ung of my our the in westaiong the paicusuly it be compstrt to disefir anyor they of terent. Moricushiossty the you the astomers treack the the comptorated and of $41296, chicad of Nancimenters. Whe storged 2 Ran 2003500 s, or plablentll swa
+4012.4s	103	[500m] GEN 'Water is' ->  a prostur and the hon a the tisbal it into sit tonders anded that theire brecats of tent, poserss for and off work arepospaning aparancets for ashoptaters. The stided may waver a t tourny don the myemply the halld iss the dresoie, muding Jain lancer laide
+4012.4s	104	[500m] ---- END GEN ----
+4103.0s	105	[500m] step  2050 loss 2.1530 bpc 3.1062 (67k tok/s) buf 1024MB
+4193.4s	106	[500m] step  2100 loss 2.1175 bpc 3.0550 (67k tok/s) buf 1024MB
+4283.7s	107	[500m] step  2150 loss 2.1223 bpc 3.0618 (67k tok/s) buf 1024MB
+4374.3s	108	[500m] step  2200 loss 2.0995 bpc 3.0289 (67k tok/s) buf 1024MB
+4464.8s	109	[500m] step  2250 loss 2.1034 bpc 3.0345 (68k tok/s) buf 1024MB
+4555.3s	110	[500m] step  2300 loss 2.0962 bpc 3.0242 (68k tok/s) buf 1024MB
+4645.8s	111	[500m] step  2350 loss 2.0804 bpc 3.0014 (68k tok/s) buf 1024MB
+4736.3s	112	[500m] step  2400 loss 2.0572 bpc 2.9680 (68k tok/s) buf 1024MB
+4826.9s	113	[500m] step  2450 loss 2.0759 bpc 2.9949 (68k tok/s) buf 1024MB
+5020.3s	114	[500m] CKPT saved at step 2499
+5024.8s	115	[500m] step  2500 loss 2.0327 bpc 2.9326 (67k tok/s) buf 1024MB
+5115.3s	116	[500m] step  2550 loss 2.0357 bpc 2.9370 (67k tok/s) buf 1024MB
+5205.7s	117	[500m] step  2600 loss 2.0028 bpc 2.8894 (67k tok/s) buf 1024MB
+5296.2s	118	[500m] step  2650 loss 2.0056 bpc 2.8935 (67k tok/s) buf 1024MB
+5386.6s	119	[500m] step  2700 loss 2.0030 bpc 2.8897 (67k tok/s) buf 1024MB
+5477.1s	120	[500m] step  2750 loss 1.9915 bpc 2.8731 (67k tok/s) buf 1024MB
+5567.6s	121	[500m] step  2800 loss 1.9871 bpc 2.8668 (67k tok/s) buf 1024MB
+5658.0s	122	[500m] step  2850 loss 1.9804 bpc 2.8571 (67k tok/s) buf 1024MB
+5748.5s	123	[500m] step  2900 loss 1.9512 bpc 2.8150 (67k tok/s) buf 1024MB
+5838.9s	124	[500m] step  2950 loss 1.9535 bpc 2.8183 (67k tok/s) buf 1024MB
+6023.4s	125	[500m] CKPT saved at step 2999
+6027.9s	126	[500m] step  3000 loss 1.9218 bpc 2.7726 (66k tok/s) buf 1024MB
+6027.9s	127	[500m] ---- GENERATION @ step 3000 ----
+6037.5s	128	[500m] GEN 'The' ->  Wby mile Poart those to with the eir consity. Cones to ficle missservex it ain the shows were a secure products in telsicall and came..b. Ton. of the Mamirion of leaving and world only the phrilip to relur the your way scometion and her hard before reclar
+6047.2s	129	[500m] GEN 'Once upon a time' -> rty beatory or equet magin and on a home stain the some or their didsis in evidery that to insure to give of the to lick char a grippode and g. If did a confirenda, is are from very sigal also diecent givet of the of had brooads, are manivews through succe
+6057.0s	130	[500m] GEN 'In 2026, the president of' ->  Vopicumaned develonsing, chalite grecation barker like dopiciation informations. If that (Torade Pacumprer Corrbidut of home years individes hor beeack bregisic and to it a blod with a personal evening badition and weelevice let iferending wend wel to the
+6066.6s	131	[500m] GEN 'Water is' ->  agnear. I're receral treals tout invibly you inderaly or and we curiedity of in the from bee used and would membercle uncose to a allso product. The specionific up and tran marked of stock about and dencres and memberth, with expaced not of you that read 
+6066.6s	132	[500m] ---- END GEN ----
+6157.1s	133	[500m] step  3050 loss 1.9256 bpc 2.7781 (66k tok/s) buf 1024MB
+6247.6s	134	[500m] step  3100 loss 1.9281 bpc 2.7817 (66k tok/s) buf 1024MB
+6338.2s	135	[500m] step  3150 loss 1.9248 bpc 2.7769 (66k tok/s) buf 1024MB
+6428.6s	136	[500m] step  3200 loss 1.9162 bpc 2.7645 (66k tok/s) buf 1024MB
+6519.2s	137	[500m] step  3250 loss 1.9088 bpc 2.7539 (66k tok/s) buf 1024MB
+6609.7s	138	[500m] step  3300 loss 1.8952 bpc 2.7342 (66k tok/s) buf 1024MB
+6700.1s	139	[500m] step  3350 loss 1.8921 bpc 2.7297 (67k tok/s) buf 1024MB
+6790.6s	140	[500m] step  3400 loss 1.8477 bpc 2.6657 (67k tok/s) buf 1024MB
+6881.0s	141	[500m] step  3450 loss 1.8405 bpc 2.6553 (67k tok/s) buf 1024MB
+6989.0s	142	[500m] CKPT saved at step 3499
+6993.6s	143	[500m] step  3500 loss 1.8479 bpc 2.6659 (67k tok/s) buf 1024MB
+7084.1s	144	[500m] step  3550 loss 1.8512 bpc 2.6707 (67k tok/s) buf 1024MB
+7174.5s	145	[500m] step  3600 loss 1.8085 bpc 2.6091 (67k tok/s) buf 1024MB
+7264.9s	146	[500m] step  3650 loss 1.8223 bpc 2.6290 (67k tok/s) buf 1024MB
+7355.3s	147	[500m] step  3700 loss 1.8048 bpc 2.6038 (67k tok/s) buf 1024MB
+7445.6s	148	[500m] step  3750 loss 1.8243 bpc 2.6320 (67k tok/s) buf 1024MB
+7536.2s	149	[500m] step  3800 loss 1.8069 bpc 2.6068 (67k tok/s) buf 1024MB
+7626.7s	150	[500m] step  3850 loss 1.7776 bpc 2.5645 (67k tok/s) buf 1024MB
+7717.1s	151	[500m] step  3900 loss 1.8047 bpc 2.6036 (67k tok/s) buf 1024MB
+7807.6s	152	[500m] step  3950 loss 1.7766 bpc 2.5631 (67k tok/s) buf 1024MB
+7901.4s	153	[500m] CKPT saved at step 3999
+7905.9s	154	[500m] step  4000 loss 1.7603 bpc 2.5396 (67k tok/s) buf 1024MB
+7905.9s	155	[500m] ---- GENERATION @ step 4000 ----
+7915.6s	156	[500m] GEN 'The' -> lan costent of positing coputing for powermenders of the rown in of the resparace, personaly while put see way not out the than the states instancement and evican assisenteriance and neal realing to precipes. There singeren custoric becausele seervices tha
+7925.3s	157	[500m] GEN 'Once upon a time' ->  gashing that day (stable of the Parontical workerned). The some looook he al conditions in a bose remainsed to six from stop thre stop and other if a loves social of the visitions gas and comprary family know pather. Becoan too technicalie is accurated fo
+7934.9s	158	[500m] GEN 'In 2026, the president of' ->  and no your completing the UKI/2012. Bout pooower and the Cary and Coledble and Starter any Pray. By harnnd which terament of the nearnts. I take of or coming Earanges a industry day. Such a rease off there player of the Prince in mail be over. With are m
+7944.6s	159	[500m] GEN 'Water is' ->  perfect to the perince more goornalizated po-the appartment had generality fastion managagements one parachased of from and my plusic in begants hapy your of may the coming production. In a lack that link to time his product the of profection emaily becau
+7944.6s	160	[500m] ---- END GEN ----
+8035.1s	161	[500m] step  4050 loss 1.7669 bpc 2.5492 (67k tok/s) buf 1024MB
+8125.5s	162	[500m] step  4100 loss 1.7846 bpc 2.5746 (67k tok/s) buf 1024MB
+8216.1s	163	[500m] step  4150 loss 1.8055 bpc 2.6047 (67k tok/s) buf 1024MB
+8306.5s	164	[500m] step  4200 loss 1.8273 bpc 2.6363 (67k tok/s) buf 1024MB
+8397.0s	165	[500m] step  4250 loss 1.8376 bpc 2.6511 (67k tok/s) buf 1024MB
+8487.6s	166	[500m] step  4300 loss 1.7904 bpc 2.5830 (67k tok/s) buf 1024MB
+8578.0s	167	[500m] step  4350 loss 1.7998 bpc 2.5966 (67k tok/s) buf 1024MB
+8668.5s	168	[500m] step  4400 loss 1.7699 bpc 2.5535 (67k tok/s) buf 1024MB
+8758.9s	169	[500m] step  4450 loss 1.7685 bpc 2.5515 (67k tok/s) buf 1024MB
+9225.6s	170	[500m] CKPT saved at step 4499
+9230.1s	171	[500m] step  4500 loss 1.7614 bpc 2.5412 (65k tok/s) buf 1024MB
+9320.5s	172	[500m] step  4550 loss 1.7143 bpc 2.4733 (65k tok/s) buf 1024MB
+9411.0s	173	[500m] step  4600 loss 1.7344 bpc 2.5022 (65k tok/s) buf 1024MB
+9501.4s	174	[500m] step  4650 loss 1.7427 bpc 2.5141 (65k tok/s) buf 1024MB
+9592.0s	175	[500m] step  4700 loss 1.7463 bpc 2.5194 (65k tok/s) buf 1024MB
+9682.6s	176	[500m] step  4750 loss 1.7211 bpc 2.4831 (65k tok/s) buf 1024MB
+9773.1s	177	[500m] step  4800 loss 1.6983 bpc 2.4501 (65k tok/s) buf 1024MB
+9863.6s	178	[500m] step  4850 loss 1.6974 bpc 2.4488 (65k tok/s) buf 1024MB
+9954.0s	179	[500m] step  4900 loss 1.6839 bpc 2.4293 (65k tok/s) buf 1024MB
+10044.6s	180	[500m] step  4950 loss 1.6892 bpc 2.4371 (65k tok/s) buf 1024MB
+10392.8s	181	[500m] CKPT saved at step 4999
+10397.4s	182	[500m] step  5000 loss 1.6863 bpc 2.4328 (64k tok/s) buf 1024MB
+10397.4s	183	[500m] ---- GENERATION @ step 5000 ----
+10407.2s	184	[500m] GEN 'The' ->  Goorkinie Sholo Hart Carine Read’s Jatin’l The ten the coure and after the topic nation suport the participates and abuse contractedly att the Resust go in the not bit of the reacility a and series that content, friendes information and 3 crotest in t
+10416.9s	185	[500m] GEN 'Once upon a time' -> d didn’ter created to these people’s really or all, where you hastrated the health of its in at residence. Ericanding: Scoker were the locassic windomantic transformator trends. The last and sizes are accorderes and willing really demands that the appr
+10426.6s	186	[500m] GEN 'In 2026, the president of' ->  the life destranced on the respace at the seecond in the today with group experiences. Of Mannald to Traine Laston Jacking 23:3 local askagrds and brand, the various course statence a and considence apph not addressess to environment and provided and fod 
+10436.3s	187	[500m] GEN 'Water is' ->  and suppers ringerst in the plant political and the pressident and we are instensially and I have ask and did the consumers will have there's healted the seconds. Grille the Lrosle of through is more many uneversity. We was because would is and parts and 
+10436.3s	188	[500m] ---- END GEN ----
+10526.6s	189	[500m] step  5050 loss 1.6957 bpc 2.4464 (63k tok/s) buf 1024MB
+10617.1s	190	[500m] step  5100 loss 1.6823 bpc 2.4270 (64k tok/s) buf 1024MB
+10707.7s	191	[500m] step  5150 loss 1.6648 bpc 2.4017 (64k tok/s) buf 1024MB
+10798.1s	192	[500m] step  5200 loss 1.6754 bpc 2.4171 (64k tok/s) buf 1024MB
+10888.6s	193	[500m] step  5250 loss 1.6674 bpc 2.4056 (64k tok/s) buf 1024MB
+10979.1s	194	[500m] step  5300 loss 1.6654 bpc 2.4026 (64k tok/s) buf 1024MB
+11069.6s	195	[500m] step  5350 loss 1.6748 bpc 2.4162 (64k tok/s) buf 1024MB
+11160.2s	196	[500m] step  5400 loss 1.6708 bpc 2.4105 (64k tok/s) buf 1024MB
+11250.6s	197	[500m] step  5450 loss 1.6615 bpc 2.3970 (64k tok/s) buf 1024MB
+11546.4s	198	[500m] CKPT saved at step 5499
+11551.0s	199	[500m] step  5500 loss 1.6289 bpc 2.3500 (63k tok/s) buf 1024MB
+11641.4s	200	[500m] step  5550 loss 1.6338 bpc 2.3571 (63k tok/s) buf 1024MB
+11732.0s	201	[500m] step  5600 loss 1.6685 bpc 2.4071 (63k tok/s) buf 1024MB
+11822.5s	202	[500m] step  5650 loss 1.6517 bpc 2.3829 (63k tok/s) buf 1024MB
+11912.9s	203	[500m] step  5700 loss 1.6129 bpc 2.3269 (63k tok/s) buf 1024MB
+12003.4s	204	[500m] step  5750 loss 1.6327 bpc 2.3555 (63k tok/s) buf 1024MB
+12093.9s	205	[500m] step  5800 loss 1.6098 bpc 2.3225 (63k tok/s) buf 1024MB
+12184.5s	206	[500m] step  5850 loss 1.6066 bpc 2.3178 (63k tok/s) buf 1024MB
+12275.0s	207	[500m] step  5900 loss 1.6059 bpc 2.3169 (64k tok/s) buf 1024MB
+12365.4s	208	[500m] step  5950 loss 1.5953 bpc 2.3015 (64k tok/s) buf 1024MB
+12500.7s	209	[500m] CKPT saved at step 5999
+12505.2s	210	[500m] step  6000 loss 1.5958 bpc 2.3023 (63k tok/s) buf 1024MB
+12505.2s	211	[500m] ---- GENERATION @ step 6000 ----
+12514.9s	212	[500m] GEN 'The' -> r of you are forkate inovice charge said. ASl of the eye, and community treated fat’s new commitment pit of torning in the very “range in Upel leter and August of the individual traitionallize States example is not all because of the same submited by a
+12524.7s	213	[500m] GEN 'Once upon a time' -> s are to go score with a destructive. Your owners everything the Usest to plans, even if can fel do taken your border down transmittted and champions practising me, for religious in the bars of Generally and patient him the resources in the simplies offer 
+12534.4s	214	[500m] GEN 'In 2026, the president of' ->  the familiar cross will read if 50 Orgin Dutsterooed Without Dozza. Exergy studies and more than a low pack option resources and investors at Nutrite Sult Communications (Upportunity (Program) manipalation of Processor) Adjaisor Conditions in currrent e q
+12544.1s	215	[500m] GEN 'Water is' ->  nowledges. So walking really shown were particularly feederal and as about on the statement to the future programm about the replacement in a street. The section by have to help you get a serious are with the sites your closed that such were we are along 
+12544.1s	216	[500m] ---- END GEN ----
+12634.6s	217	[500m] step  6050 loss 1.6158 bpc 2.3310 (63k tok/s) buf 1024MB

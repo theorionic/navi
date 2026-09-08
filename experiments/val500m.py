@@ -126,7 +126,7 @@ def main():
         time.sleep(2)
     val_bytes = feed.val.array()
     log(f"stage 3/6 done: val buffer {len(val_bytes)/1024/1024:.1f}MB "
-        f"({VAL_DOCS} docs)", flush=True)
+        f"({VAL_DOCS} docs)")
 
     # 4. model config must match training exactly
     log("stage 4/6: building model + jit compile (one-time, ~30-60s)")

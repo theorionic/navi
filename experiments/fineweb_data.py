@@ -118,6 +118,7 @@ class FineWebFeed:
             try:
                 for kind, ids in token_stream(iter(self.stream), n_val_docs=n_val_docs):
                     with self._lock:
+                        self.docs += 1
                         if kind == "val" and not self.val.full:
                             self.val.add(ids)
                         else:

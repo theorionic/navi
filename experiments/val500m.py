@@ -109,16 +109,24 @@ def main():
         f"(HF datasets init took ~4min on the training run - this is the "
         f"slow part, progress prints follow every 30s)")
     feed = FineWebFeed(n_val_docs=VAL_DOCS)
-    for tick in range(900):  # hard cap 30min
-        if feed.val.full:
+    log("  waiting for the val docs to drain through the producer "
+        "(watch the TRAIN buffer: it starts growing only after all "
+        "val docs have streamed through)")
+    prev_train = -1
+    for tick in range(600):  # hard cap 20min; real: ~60s total
+        tb = len(feed.train_buf)
+        # val docs stream FIRST; the moment train bytes appear, every val
+        # doc has passed. (val.full can never fire: 2000 docs ~= 6MB <
+        # the 24MB cap -- this exact dead-wait burned 20-30min in v2/v3.)
+        if tb > 0:
             break
-        if tick % 15 == 0:  # every 30s: producer heartbeat
-            log(f"  val fill: {feed.val.total/1024/1024:.1f}MB "
-                f"({feed.docs} docs seen){' FULL' if feed.val.full else ''}")
+        if tb != prev_train and tick % 15 == 0:
+            log(f"  val fill: {feed.val.total/1024/1024:.1f}MB so far")
+            prev_train = tb
         time.sleep(2)
     val_bytes = feed.val.array()
     log(f"stage 3/6 done: val buffer {len(val_bytes)/1024/1024:.1f}MB "
-        f"({'full cap' if feed.val.full else 'partial - capped by timeout'})")
+        f"({VAL_DOCS} docs)", flush=True)
 
     # 4. model config must match training exactly
     log("stage 4/6: building model + jit compile (one-time, ~30-60s)")

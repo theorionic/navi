@@ -24,8 +24,11 @@ NAVl_VAL_DOCS (2000 fresh docs for the val buffer).
 Usage: python3 /kaggle/working/navi/experiments/val500m.py
 """
 import sys
-sys.path.insert(0, "/kaggle/working")
 import os
+# make "navi" package importable regardless of cwd: this file lives in
+# <repo>/experiments/, so the repo root is exactly one level up
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _REPO)
 import glob
 import gc
 import re

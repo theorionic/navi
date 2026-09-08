@@ -17,6 +17,7 @@ NAVI_SEQ (512), NAVI_RESUME=1 to resume from ckpt_500m.pkl.
 import sys
 sys.path.insert(0, "/kaggle/working")
 from functools import partial
+import gc
 import os
 import pickle
 import time
@@ -50,6 +51,30 @@ def shard_tree(tree):
             return jax.device_put(x, jax.sharding.NamedSharding(
                 mesh, jax.sharding.PartitionSpec(None, "cores")))
         return jax.device_put(x, REPL)
+
+
+def reshard_tree(tree):
+    """Re-place arrays onto the mesh WITHOUT concatenating or copying data
+    through host memory. jax.device_put with a sharding matching the current
+    layout is a no-op; with a different one it moves just that array."""
+    def place(kp, x):
+        ks = jax.tree_util.keystr(kp)
+        if "values" in ks:
+            return jax.device_put(x, jax.sharding.NamedSharding(
+                mesh, jax.sharding.PartitionSpec(None, "cores")))
+        return jax.device_put(x, REPL)
+    return jax.tree_util.tree_map_with_path(place, tree)
+
+
+def load_ckpt_sharded(path):
+    """Pickle a checkpoint and put every array directly on its target
+    shard. Loading yields host/numpy arrays; device_put distributes them,
+    so HBM never holds a full unsharded replica of params+opt."""
+    with open(path, "rb") as f:
+        st = pickle.load(f)
+    p = reshard_tree(st["params"])
+    o = reshard_tree(st["opt"]) if st.get("opt") is not None else None
+    return p, o, st["step"]
     return jax.tree_util.tree_map_with_path(place, tree)
 
 
@@ -161,6 +186,8 @@ def main():
     p = shard_tree(p0)
     tx = make_tx(p0)
     o = shard_tree(tx.init(p0))
+    del p0, flat  # host-side init copies; not needed once tx is built
+    gc.collect()
 
     feed = FineWebFeed(n_val_docs=4000)
     feed.wait_ready(min_bytes=256 * 1024 * 1024)
@@ -182,16 +209,18 @@ def main():
     os.makedirs(ckpt_dir, exist_ok=True)
     keep = int(os.environ.get("NAVI_KEEP_CKPT", "3"))
     start = 0
-    ckpt_path = None
     if os.environ.get("NAVI_RESUME") == "1":
-        ckpts = sorted(f for f in os.listdir(ckpt_dir) if f.startswith("ckpt_500m_step") and f.endswith(".pkl"))
+        ckpts = sorted(f for f in os.listdir(ckpt_dir)
+                       if f.startswith("ckpt_500m_step") and f.endswith(".pkl"))
         if ckpts:
             ckpt_path = os.path.join(ckpt_dir, ckpts[-1])
-            with open(ckpt_path, "rb") as f:
-                st = pickle.load(f)
-            p, o, start = st["params"], st["opt"], st["step"] + 1
-            print(f"[{TAG}] RESUMED from {ckpt_path} at step {start}", flush=True)
-
+            # must load AFTER freeing the init-time p0/o replicas? p0 is
+            # still referenced by shard_tree outputs -- del before load
+            del p, o
+            gc.collect()
+            p, o, start = load_ckpt_sharded(ckpt_path)
+            print(f"[{TAG}] RESUMED from {ckpt_path} at step {start} "
+                  f"(sharded onto mesh)", flush=True)
     t0 = time.time()
     losses = []
     for i in range(start, STEPS):

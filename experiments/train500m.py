@@ -75,7 +75,14 @@ def load_ckpt_sharded(path):
     p = reshard_tree(st["params"])
     o = reshard_tree(st["opt"]) if st.get("opt") is not None else None
     return p, o, st["step"]
-    return jax.tree_util.tree_map_with_path(place, tree)
+
+
+def grad_norm(g):
+    """Global L2 norm of a gradient pytree (host float) - logging only."""
+    sq, n = jax.tree_util.tree_reduce(
+        lambda acc, x: (acc[0] + jnp.sum(x * x), acc[1] + x.size),
+        g, (jnp.float32(0.0), 0))
+    return float(jnp.sqrt(sq)), n
 
 
 def loss_fn(model, p, ids, tg):
@@ -198,10 +205,19 @@ def main():
     @jax.jit
     def step(pp, oo, ids, tg):
         g = jax.grad(lambda q, a, t: loss_fn(model, q, a, t))(pp, ids, tg)
+        # split grads: mem (values/keys) vs core for separate norm logging
+        gm = jax.tree_util.tree_map_with_path(
+            lambda kp, x: x if is_mem(kp) else jnp.zeros_like(x), g)
+        gc_ = jax.tree_util.tree_map_with_path(
+            lambda kp, x: jnp.zeros_like(x) if is_mem(kp) else x, g)
         g = jax.tree_util.tree_map_with_path(
-            lambda kp, x: x * 10.0 if "mem" in jax.tree_util.keystr(kp) else x, g)
+            lambda kp, x: x * 10.0 if is_mem(kp) else x, g)
         u, oo2 = tx.update(g, oo, pp)
-        return optax.apply_updates(pp, u), oo2
+        nrm = (jnp.sqrt(jax.tree_util.tree_reduce(
+            lambda a, x: a + jnp.sum(x * x), gc_, jnp.float32(0.0))),
+               jnp.sqrt(jax.tree_util.tree_reduce(
+            lambda a, x: a + jnp.sum(x * x), gm, jnp.float32(0.0))))
+        return optax.apply_updates(pp, u), oo2, nrm
 
     # checkpoints live in /kaggle/working (persists on notebook commit);
     # keep only the latest NAVI_KEEP_CKPT (default 3) to bound disk use
@@ -223,25 +239,38 @@ def main():
                   f"(sharded onto mesh)", flush=True)
     t0 = time.time()
     losses = []
+    val_hist = []  # (step, val_bpc) - tracked at every gen point
+    vb = feed.val.array()
+    print(f"[{TAG}] val buffer {len(vb)/1024/1024:.1f}MB held out", flush=True)
+    gn_hist = []  # (step, core_gnorm, mem_gnorm)
     for i in range(start, STEPS):
         win = feed.batch(rng, BS, SEQ)
         ids = jax.device_put(win[:, :-1], BATCH)
         tg = jax.device_put(win[:, 1:], BATCH)
-        p, o = step(p, o, ids, tg)
+        p, o, (gn_core, gn_mem) = step(p, o, ids, tg)
         if i % 50 == 0 or i == STEPS - 1:
             l = float(loss_fn(model, p, ids, tg))
             losses.append(l)
             tps = (i - start + 1) * BS * SEQ / max(1e-9, time.time() - t0)
-            print(f"[{TAG}] step {i:5d} loss {l:.4f} bpc {l/np.log(2):.4f} "
-                  f"({tps/1e3:.0f}k tok/s) buf {len(feed.train_buf)//(1024*1024)}MB",
+            eta_s = (STEPS - i - 1) * BS * SEQ / max(1e-9, tps)
+            print(f"[{TAG}] step {i:5d}/{STEPS} loss {l:.4f} "
+                  f"bpc {l/np.log(2):.4f} gn(core) {gn_core:.3f} "
+                  f"gn(mem) {gn_mem:.3f} ({tps/1e3:.0f}k tok/s "
+                  f"eta {eta_s/3600:.1f}h) buf {len(feed.train_buf)//(1024*1024)}MB",
                   flush=True)
+        if i % 100 == 99:  # grad-norm trend between log points
+            gn_hist.append((i, float(gn_core), float(gn_mem)))
         if i % GEN_EVERY == 0 or i == STEPS - 1:
+            v = val_loss(model, p, vb)
+            val_hist.append((i, v))
+            print(f"[{TAG}] VAL@{i} bpc {v:.4f} (held-out)", flush=True)
             do_generation(model, p, i)
         if i % 500 == 499 or i == STEPS - 1:
             ck = os.path.join(ckpt_dir, f"ckpt_500m_step{i:06d}.pkl")
             with open(ck + ".tmp", "wb") as f:
                 pickle.dump({"params": p, "opt": o, "rng": None, "step": i,
-                             "losses": losses}, f)
+                             "losses": losses, "val_hist": val_hist,
+                             "gn_hist": gn_hist}, f)
             os.replace(ck + ".tmp", ck)  # atomic on same fs
             # rotate: newest NAVI_KEEP_CKPT survive
             old = sorted(f for f in os.listdir(ckpt_dir)
@@ -253,8 +282,11 @@ def main():
                     pass
             print(f"[{TAG}] CKPT saved {ck} (keeping {min(len(old), keep)})", flush=True)
 
-    vb = feed.val.array()
-    print(f"[{TAG}] VAL bpc {val_loss(model, p, vb):.4f}", flush=True)
+    v = val_loss(model, p, vb)
+    print(f"[{TAG}] VAL bpc {v:.4f}", flush=True)
+    print(f"[{TAG}] VAL_HIST " + " ".join(f"{s}:{b:.4f}" for s, b in val_hist), flush=True)
+    print(f"[{TAG}] GN_SUMMARY last10 " + " ".join(
+        f"{s}:{c:.3f}/{m:.3f}" for s, c, m in gn_hist[-10:]), flush=True)
     print(f"[{TAG}] DONE", flush=True)
 
 

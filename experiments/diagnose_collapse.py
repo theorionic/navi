@@ -20,6 +20,13 @@ CKPTS = [("S1-65k", "/kaggle/working/experiments/ckpt_C-S1.pkl", 64),
          ("S2-1M",  "/kaggle/working/experiments/ckpt_C-S2.pkl", 256),
          ("S3-16M", "/kaggle/working/experiments/ckpt_C-S3.pkl", 1024)]
 
+# 500m run: newest rolling checkpoint (ckpt_500m_stepNNNNNN.pkl, params+opt)
+import glob as _glob, re as _re
+_c5 = sorted(f for f in _glob.glob("/kaggle/working/experiments/ckpt_500m_step*.pkl")
+             if _re.match(r"ckpt_500m_step\d+\.pkl", os.path.basename(f)))
+if _c5:
+    CKPTS.append(("500m-@" + _re.search(r"(\d+)\.pkl", _c5[-1]).group(1), _c5[-1], 1024))
+
 def eff_rank(x, cap=4096):
     s = np.linalg.svd(x[:: max(1, len(x) // cap)], compute_uv=False)
     p = s / (s.sum() + 1e-12)

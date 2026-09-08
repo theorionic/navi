@@ -16,16 +16,22 @@ import jax, jax.numpy as jnp
 import numpy as np
 import jax.tree_util as tu
 
-CKPTS = [("S1-65k", "/kaggle/working/experiments/ckpt_C-S1.pkl", 64),
-         ("S2-1M",  "/kaggle/working/experiments/ckpt_C-S2.pkl", 256),
-         ("S3-16M", "/kaggle/working/experiments/ckpt_C-S3.pkl", 1024)]
-
-# 500m run: newest rolling checkpoint (ckpt_500m_stepNNNNNN.pkl, params+opt)
+# checkpoint registry: (label, path). S1/S2/S3 = older scaling-run ckpts
+# that may no longer exist; the 500m entry is the newest rolling checkpoint.
 import glob as _glob, re as _re
+CKPTS = [("S1-65k", "/kaggle/working/experiments/ckpt_C-S1.pkl"),
+         ("S2-1M",  "/kaggle/working/experiments/ckpt_C-S2.pkl"),
+         ("S3-16M", "/kaggle/working/experiments/ckpt_C-S3.pkl")]
 _c5 = sorted(f for f in _glob.glob("/kaggle/working/experiments/ckpt_500m_step*.pkl")
              if _re.match(r"ckpt_500m_step\d+\.pkl", os.path.basename(f)))
 if _c5:
-    CKPTS.append(("500m-@" + _re.search(r"(\d+)\.pkl", _c5[-1]).group(1), _c5[-1], 1024))
+    CKPTS.append(("500m-@" + _re.search(r"(\d+)\.pkl", _c5[-1]).group(1), _c5[-1]))
+# drop entries whose file is gone; say so once instead of failing per-ckpt
+_present = [(t, p) for t, p in CKPTS if os.path.exists(p)]
+for t, p in CKPTS:
+    if not os.path.exists(p):
+        print(f"[skip] {t}: {os.path.basename(p)} not present (older run)")
+CKPTS = _present
 
 def eff_rank(x, cap=4096):
     s = np.linalg.svd(x[:: max(1, len(x) // cap)], compute_uv=False)
@@ -54,7 +60,7 @@ def gini(counts):
     ranks = np.arange(1, n + 1)
     return float((2 * (ranks * c).sum()) / (n * c.sum()) - (n + 1) / n)
 
-for tag, path, nonce in CKPTS:
+for tag, path in CKPTS:
     try:
         with open(path, "rb") as f:
             params = pickle.load(f)

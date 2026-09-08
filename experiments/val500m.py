@@ -41,7 +41,7 @@ import optax
 
 from navi.config import MemoryConfig, ModelConfig
 from navi.model import Navi
-from fineweb_data import FineWebFeed
+from fineweb_data import BOS, FineWebFeed
 
 TAG = "val500m"
 SEQ = int(os.environ.get("NAVI_SEQ", "512"))
@@ -155,6 +155,11 @@ def main():
             offs = rng.integers(0, len(val_bytes) - SEQ - 2, size=EVAL_BS)
             idx = offs[:, None] + np.arange(SEQ + 1)[None, :]
             win = val_bytes[idx]
+            # EXACT training-distribution windows: RollingBytes.sample()
+            # overwrites the first byte of every window with BOS (256) --
+            # the model never saw a BOS-less window in 20k steps, so eval
+            # must match (v1 eval fed raw windows: OOD, 5.87 vs 1.91 bpc).
+            win[:, 0] = BOS
             ids = jax.device_put(win[:, :-1], BATCH)
             tg = jax.device_put(win[:, 1:], BATCH)
             ces.append(float(ev(params, ids, tg)))

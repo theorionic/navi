@@ -59,7 +59,7 @@ G = 8                          # GRPO group size
 L = 4                          # completion length (tokens)
 LR_SFT = 5e-5                  # 10x below small-model: 556M params
 LR_RL = float(os.environ.get("NAVI_RL_LR", "1e-5"))
-ENT_BONUS = 0.01               # entropy regularizer (anti-mode-collapse)
+ENT_BONUS = float(os.environ.get("NAVI_ENT", "0.01"))  # anti-mode-collapse
 GREEDY_TESTS = 40
 
 mesh = jax.sharding.Mesh(jax.local_devices(), ("cores",))

@@ -223,8 +223,8 @@ def main():
         pr = []
         for _ in range(n):
             off = r2.integers(0, len(val_bytes) - SEQ - GEN_L - 4)
-            chunk = val_bytes[off:off + 40]
-            # cut at last space to start mid-word-free
+            chunk = bytes(val_bytes[off:off + 40])
+            # cut at last space so the prompt never ends mid-word
             sp = chunk.rfind(b' ')
             if sp > 8:
                 chunk = chunk[:sp]
@@ -371,12 +371,12 @@ def main():
         log(f"  post sample: {bytes(np.clip(ob2[i, 0], 0, 255)).decode('utf-8', 'replace')!r}")
 
     # teacher-forced val bpc must not degrade
+    vb = jnp.asarray(np.asarray(val_bytes[:SEQ * 8], dtype=np.uint8).reshape(8, SEQ), jnp.int32)
     @jax.jit
     def val_bpc(pp):
-        d = np.frombuffer(val_bytes[:SEQ * 8 * 4], dtype=np.uint8)
-        win = d[:SEQ * 8].reshape(8, SEQ)
-        logits = model.apply(pp, win[:, :-1], train=False)
-        ce = optax.softmax_cross_entropy_with_integer_labels(logits, win[:, 1:])
+        logits = model.apply(pp, vb[:, :-1], train=False)
+        ce = optax.softmax_cross_entropy_with_integer_labels(
+            logits, vb[:, 1:])
         return ce.mean() / jnp.log(2)
 
     bpc_before = float(val_bpc(shard_tree(p)))

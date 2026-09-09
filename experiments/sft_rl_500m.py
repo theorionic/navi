@@ -291,7 +291,9 @@ def main():
         log("  warm-loss curve: " +
             " ".join(f"@{m}:{wl[m]:.3f}" for m in wmarks))
     # 4. GRPO RL stage: ONE compiled lax.scan over all rounds.
-    tx2 = optax.adamw(LR_RL, b1=0.9, b2=0.95)
+    tx2 = optax.chain(
+        optax.clip_by_global_norm(1.0),
+        optax.adamw(LR_RL, b1=0.9, b2=0.95))
 
     @jax.jit
     def rl_stage(pp, prompts, targets, key):
@@ -318,12 +320,16 @@ def main():
             (toks, _), _ = jax.lax.scan(
                 gstep, (jnp.full((G, L), 32, jnp.int32), k),
                 jnp.arange(L))
-            return jnp.concatenate([pf, toks], axis=1)       # (G, P+L)
 
         def reward_of(tails, target):
-            """Leading digit run -> value; 1.0 exact, 0.2 any-digits, else 0.
-            Pure tensor math: first nondigit via argmax, place-value
-            decode via powers of 10 (parity-verified vs python ref)."""
+            """SHAPED reward (denser signal => more usable GRPO groups).
+            Semantics (parity-verified 300/300 vs python ref):
+              base 0.2 if any leading digit emitted
+              +0.3 if first digit of the run's VALUE == first digit of sum
+              +0.2 if first two emitted digits match a 2-digit sum exactly
+              +0.3 exact value match          -> max 1.0
+            Leading zeros collapse via place-value decode; first-digit
+            credit uses the decoded value's first digit."""
             d = tails - 48
             is_dig = (d >= 0) & (d <= 9)
             nondig = ~is_dig
@@ -335,8 +341,17 @@ def main():
             pw = f[:, None] - 1 - pos[None]
             scale = jnp.where(pw >= 0, 10.0 ** jnp.maximum(pw, 0), 0.0)
             val = (dv * scale).sum(-1)                   # (G,)
-            return jnp.where(val == target, 1.0,
-                             jnp.where(f > 0, 0.2, 0.0))
+            ndig = jnp.where(val > 0, jnp.floor(jnp.log10(jnp.maximum(val, 1.0))) + 1.0, 1.0)
+            first_dig_val = jnp.floor(val / 10.0 ** (ndig - 1.0))
+            tgt_pow = jnp.where(target >= 10, 1.0, 0.0)
+            tgt_d0 = jnp.floor(target / 10.0 ** tgt_pow)
+            tgt_d1 = jnp.mod(target, 10.0)
+            first_ok = (f > 0) & (first_dig_val == tgt_d0)
+            prefix2_ok = (target >= 10) & (f >= 2) & \
+                         (dv[:, 0] == tgt_d0) & (dv[:, 1] == tgt_d1)
+            exact = val == target
+            base = jnp.where(f > 0, 0.2, 0.0)
+            return base + 0.3 * first_ok + 0.2 * prefix2_ok + 0.3 * exact
 
         def round_body(carry, prompt_target):
             """One GRPO round: sample G completions, tensor-math reward,

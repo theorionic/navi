@@ -157,13 +157,40 @@ def main():
     all_ids = np.empty((SFT_STEPS, EVAL_BS, SEQ), dtype=np.int32)
     n_rep = int(EVAL_BS * REPLAY_FRAC)
     all_tg = np.empty((SFT_STEPS, EVAL_BS, SEQ), dtype=np.int32)
+    # per-position loss weights: SUM DIGITS after 'c: ' get DIGIT_W so the
+    # arithmetic mapping is actually learned (unweighted SFT leaves the
+    # sum token at chance -- measured on TPU: P(correct)=0.100=1/9).
+    DIGIT_W = float(os.environ.get("NAVI_DIGIT_W", "8"))
+    all_w = np.ones((SFT_STEPS, EVAL_BS, SEQ), dtype=np.float32)
     for s in range(SFT_STEPS):
         ids_r, tg_r = windows(replay_data, rng, n_rep, SEQ)
         ids_s, tg_s = windows(sft_data, rng, EVAL_BS - n_rep, SEQ)
         ids = np.concatenate([ids_s, ids_r])
         tg = np.concatenate([tg_s, tg_r])
         perm = rng.permutation(len(ids))
-        all_ids[s], all_tg[s] = ids[perm], tg[perm]
+        ids, tg = ids[perm], tg[perm]
+        # weight rule: boost ONLY the ANSWER digits (the sum after 'c: '),
+        # not the question digits. Track the most recent section marker in
+        # the source stream: after seeing 'c' ':' the section is 'answer'
+        # until the next 'q' marker or newline-resolved section switch.
+        # Simple state machine over the source bytes, vectorized per row.
+        cur_digit = (tg >= 48) & (tg <= 57)
+        sec = np.zeros_like(ids, dtype=np.float32)
+        for row in range(len(ids)):
+            st = 0.0
+            for j in range(ids.shape[1]):
+                c_ = int(ids[row, j])
+                if c_ == 99:   # 'c' -> answer section starts (c: ...)
+                    st = 1.0
+                elif c_ == 113:  # 'q' -> question section
+                    st = 0.0
+                elif c_ == 10:   # '\n' ends the current line
+                    st = 0.0
+                sec[row, j] = st
+        boost = cur_digit & (sec > 0)
+        w = np.where(boost, DIGIT_W, 1.0).astype(np.float32)
+        all_ids[s], all_tg[s] = ids, tg
+        all_w[s] = w
 
     @jax.jit
     def ev(pp, ids, tg):
@@ -179,17 +206,17 @@ def main():
     tx1 = optax.adamw(LR_SFT, b1=0.9, b2=0.95)
 
     @jax.jit
-    def sft_stage(pp, batches_ids, batches_tg):
+    def sft_stage(pp, batches_ids, batches_tg, batches_w):
         o = tx1.init(pp)
 
         def body(carry, batch):
             q, oo = carry
-            ids, tg = batch
+            ids, tg, wt = batch
 
             def loss_fn(w):
                 logits = model.apply(w, ids, train=True)
-                return optax.softmax_cross_entropy_with_integer_labels(
-                    logits, tg).mean()
+                ce = optax.softmax_cross_entropy_with_integer_labels(logits, tg)
+                return (ce * wt).sum() / wt.sum()
 
             g = jax.grad(loss_fn)(q)
             u, oo2 = tx1.update(g, oo, q)
@@ -197,7 +224,7 @@ def main():
             return (q2, oo2), loss_fn(q2)
 
         (pf, _), losses = jax.lax.scan(
-            body, (pp, o), (batches_ids, batches_tg))
+            body, (pp, o), (batches_ids, batches_tg, batches_w))
         return pf, losses
 
     bpc_sft0 = bpc_of(p, eval_sft_ids, eval_sft_tg)
@@ -208,7 +235,8 @@ def main():
     p, train_losses = sft_stage(
         p,
         jax.device_put(all_ids, BSTACK),
-        jax.device_put(all_tg, BSTACK))
+        jax.device_put(all_tg, BSTACK),
+        jax.device_put(all_w, BSTACK))
     tl = np.asarray(train_losses)
     if SFT_STEPS > 0:
         marks = sorted(set([0, SFT_STEPS // 4, SFT_STEPS // 2,
@@ -254,7 +282,8 @@ def main():
     p, warm_losses = sft_stage(
         p,
         jax.device_put(all_wids, BSTACK),
-        jax.device_put(all_wtg, BSTACK))
+        jax.device_put(all_wtg, BSTACK),
+        jax.device_put(np.ones_like(all_wids, dtype=np.float32), BSTACK))
     wl = np.asarray(warm_losses)
     if WARM_STEPS > 0:
         wmarks = sorted(set([0, WARM_STEPS // 4, WARM_STEPS // 2,

@@ -50,7 +50,7 @@ B_ROUNDS = int(os.environ.get("NAVI_B_ROUNDS", "400"))
 LR_A = float(os.environ.get("NAVI_LR_A", "3e-5"))
 G = 8
 L = 4
-ENT_BONUS = 0.05
+ENT_BONUS = float(os.environ.get("NAVI_ENT", "0.05"))
 NCTX = 3                       # ICL ctx for probe AND RL prompts
 SLOT = 12                      # 'q: A+B\nc: S\n'
 GREEDY_TESTS = 40
@@ -230,7 +230,7 @@ def main():
         f"restored for RL")
 
     # ------------------------------------------------ stage B: GRPO -------
-    LR_RL = 3e-5
+    LR_RL = float(os.environ.get("NAVI_RL_LR", "3e-5"))
     tx2 = optax.chain(
         optax.clip_by_global_norm(1.0),
         optax.adamw(LR_RL, b1=0.9, b2=0.95))

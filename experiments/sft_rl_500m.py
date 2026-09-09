@@ -320,6 +320,7 @@ def main():
             (toks, _), _ = jax.lax.scan(
                 gstep, (jnp.full((G, L), 32, jnp.int32), k),
                 jnp.arange(L))
+            return jnp.concatenate([pf, toks], axis=1)       # (G, P+L)
 
         def reward_of(tails, target):
             """SHAPED reward (denser signal => more usable GRPO groups).

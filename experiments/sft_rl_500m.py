@@ -234,6 +234,7 @@ def main():
     #     battery proved GRPO needs the policy initialized near the task
     #     distribution: without this, samples never emit digits => zero
     #     reward variance => zero advantage => no learning signal.
+    NCTX = int(os.environ.get("NAVI_NCTX", "3"))     # solved examples (ICL)
     WARM_STEPS = int(os.environ.get("NAVI_WARM_STEPS", "120"))
     raw_data = make_docs(600, rng, 1, 9, "raw")
     eval_raw_ids, eval_raw_tg = windows(raw_data, rng, EVAL_BS, SEQ)
@@ -255,11 +256,11 @@ def main():
         jax.device_put(all_wids, BSTACK),
         jax.device_put(all_wtg, BSTACK))
     wl = np.asarray(warm_losses)
-    wmarks = sorted(set([0, WARM_STEPS // 4, WARM_STEPS // 2,
-                         3 * WARM_STEPS // 4, WARM_STEPS - 1]))
-    log("  warm-loss curve: " +
-        " ".join(f"@{m}:{wl[m]:.3f}" for m in wmarks))
-
+    if WARM_STEPS > 0:
+        wmarks = sorted(set([0, WARM_STEPS // 4, WARM_STEPS // 2,
+                             3 * WARM_STEPS // 4, WARM_STEPS - 1]))
+        log("  warm-loss curve: " +
+            " ".join(f"@{m}:{wl[m]:.3f}" for m in wmarks))
     # 4. GRPO RL stage: ONE compiled lax.scan over all rounds.
     tx2 = optax.adamw(LR_RL, b1=0.9, b2=0.95)
 

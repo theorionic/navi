@@ -259,13 +259,14 @@ def main():
             buf = buf.at[:, t + 1].set(nxt)
             return (buf, kk), nxt
 
+        # prompt already starts with BOS (make_prompts prepends it); NO
+        # second BOS -- sampling starts from the last prompt byte.
         buf0 = jnp.zeros((N_SAMPLES, SEQ), jnp.int32)
         buf0 = buf0.at[:, :P].set(jnp.tile(prompt, (N_SAMPLES, 1)))
-        buf0 = buf0.at[:, P].set(BOS)
         (buf, _), out = jax.lax.scan(
             gstep, (buf0, key),
-            jnp.arange(P, P + GEN_L))          # writes buf[:, P+1 .. P+GEN_L]
-        return buf, out                        # (S, SEQ), (GEN_L, S)
+            jnp.arange(P - 1, P - 1 + GEN_L))  # reads buf[:, P-1] first;
+        return buf, out                        # writes buf[:, P..P+GEN_L-1]
 
     @jax.jit
     def reward_outs(outs):
@@ -338,12 +339,12 @@ def main():
                 buf = buf.at[:, t + 1].set(nxt)
                 return (buf, k2), nxt
 
+            # prompt already begins with BOS; sample from its last byte
             buf0 = jnp.zeros((N_SAMPLES, SEQ), jnp.int32)
             buf0 = buf0.at[:, :P].set(jnp.tile(pr, (N_SAMPLES, 1)))
-            buf0 = buf0.at[:, P].set(BOS)
             (buf, _), out = jax.lax.scan(
                 gstep, (buf0, k1),
-                jnp.arange(P, P + GEN_L))
+                jnp.arange(P - 1, P - 1 + GEN_L))
             return buf, out                              # (S,SEQ),(GEN_L,S)
 
         keys = jax.random.split(kk, prompts.shape[0])

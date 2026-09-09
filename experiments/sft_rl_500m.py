@@ -151,6 +151,7 @@ def main():
     eval_sft_ids, eval_sft_tg = windows(sft_data, rng, EVAL_BS, SEQ)
     eval_rep_ids, eval_rep_tg = windows(replay_data, rng, EVAL_BS, SEQ)
     all_ids = np.empty((SFT_STEPS, EVAL_BS, SEQ), dtype=np.int32)
+    n_rep = int(EVAL_BS * REPLAY_FRAC)
     all_tg = np.empty((SFT_STEPS, EVAL_BS, SEQ), dtype=np.int32)
     for s in range(SFT_STEPS):
         ids_r, tg_r = windows(replay_data, rng, n_rep, SEQ)

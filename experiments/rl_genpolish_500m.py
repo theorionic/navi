@@ -276,6 +276,12 @@ def main():
             all_outs.append(np.asarray(out.T))          # (S, GEN_L)
         return np.stack(all_outs)                       # (P, S, GEN_L)
 
+    def decode_sample(row):
+        """(GEN_L,) int32 sample -> printable str. bytes() on int32
+        arrays serializes 4 bytes per element (the \x00 padding
+        artifact), so cast to uint8 first; non-printables -> '.'."""
+        b = np.asarray(row, dtype=np.int32).clip(0, 255).astype(np.uint8)
+        return "".join(chr(c) if 32 <= c < 127 else "." for c in b)
 
     # quick pre-check: sample from pretrained model, measure reward
     kk = jax.random.PRNGKey(42)
@@ -287,7 +293,7 @@ def main():
         f"(ascii/word/loop mix; tails below)")
     ob = outs_np                                    # (P, S, GEN_L)
     for i in range(3):
-        log(f"  pre sample: {bytes(np.clip(ob[i, 0], 0, 255)).decode('utf-8', 'replace')!r}")
+        log(f"  pre sample: {decode_sample(ob[i, 0])!r}")
 
     # ------------------------------- REINFORCE polish --------------------
     tx = optax.chain(
@@ -376,7 +382,7 @@ def main():
     log(f"AFTER: mean quality reward {r1.mean():.3f} (before {r0.mean():.3f})")
     ob2 = outs_np2
     for i in range(3):
-        log(f"  post sample: {bytes(np.clip(ob2[i, 0], 0, 255)).decode('utf-8', 'replace')!r}")
+        log(f"  post sample: {decode_sample(ob2[i, 0])!r}")
 
     # teacher-forced val bpc must not degrade
     vb = jnp.asarray(np.asarray(val_bytes[:SEQ * 8], dtype=np.uint8).reshape(8, SEQ), jnp.int32)

@@ -86,6 +86,8 @@ def make_docs(n, rng, lo, hi, fmt):
         a, b = int(rng.integers(lo, hi)), int(rng.integers(lo, hi))
         if fmt == "chain":
             docs.append(f"q: {a}+{b}\nc: {a+b}\n")
+        elif fmt == "raw":
+            docs.append(f"{a}+{b}={a+b} ")
         else:  # 'pre' = FineWeb-like filler text (replay source)
             filler = "log " if (a + b) % 2 == 0 else "the cat sat "
             docs.append(f"{filler}note {a}+{b}={a+b} end. ")
@@ -227,6 +229,37 @@ def main():
     #    reward via tensor-math leading-digit-run parse, group-relative
     #    advantage, PG + entropy gradient, AdamW update.
     #    Outputs: per-round rewards (R, G) and tails (R, G, L) -> host once.
+    # 3b. RL warmup: brief SFT on the RAW 'a+b=sum' format. The small-model
+    #     battery proved GRPO needs the policy initialized near the task
+    #     distribution: without this, samples never emit digits => zero
+    #     reward variance => zero advantage => no learning signal.
+    WARM_STEPS = int(os.environ.get("NAVI_WARM_STEPS", "120"))
+    raw_data = make_docs(600, rng, 1, 9, "raw")
+    eval_raw_ids, eval_raw_tg = windows(raw_data, rng, EVAL_BS, SEQ)
+    all_wids = np.empty((WARM_STEPS, EVAL_BS, SEQ), dtype=np.int32)
+    all_wtg = np.empty((WARM_STEPS, EVAL_BS, SEQ), dtype=np.int32)
+    for s in range(WARM_STEPS):
+        ids_r, tg_r = windows(replay_data, rng, n_rep, SEQ)
+        ids_s, tg_s = windows(raw_data, rng, EVAL_BS - n_rep, SEQ)
+        ids = np.concatenate([ids_s, ids_r])
+        tg = np.concatenate([tg_s, tg_r])
+        perm = rng.permutation(len(ids))
+        all_wids[s], all_wtg[s] = ids[perm], tg[perm]
+
+    log(f"stage 1b: RL-warmup SFT {WARM_STEPS} steps on raw 'a+b=sum' "
+        f"(replay {REPLAY_FRAC:.0%}, lr {LR_SFT}) -- single compile")
+    log(f"  start: raw-fmt bpc {bpc_of(p, eval_raw_ids, eval_raw_tg):.3f}")
+    p, warm_losses = sft_stage(
+        p,
+        jax.device_put(all_wids, BSTACK),
+        jax.device_put(all_wtg, BSTACK))
+    wl = np.asarray(warm_losses)
+    log("  warm-loss curve: " +
+        " ".join(f"@{m}:{wl[m]:.3f}" for m in marks))
+    log(f"  end: raw-fmt bpc {bpc_of(p, eval_raw_ids, eval_raw_tg):.3f} | "
+        f"replay-fmt {bpc_of(p, eval_rep_ids, eval_rep_tg):.3f}")
+
+    # 4. GRPO RL stage: ONE compiled lax.scan over all rounds.
     tx2 = optax.adamw(LR_RL, b1=0.9, b2=0.95)
 
     @jax.jit

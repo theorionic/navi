@@ -37,23 +37,28 @@ Env: NAVI_POLISH_ROUNDS (200) NAVI_GEN_L (64) NAVI_PROMPTS (32)
      NAVI_LR (2e-6) NAVI_SAMPLES (16)
 Usage: python3 /kaggle/working/navi/experiments/rl_genpolish_500m.py
 """
-import sys
 import os
-_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, _REPO)
-GEN_L = int(os.environ.get("NAVI_GEN_L", "48"))     # sampled continuation len
-N_PROMPTS = int(os.environ.get("NAVI_PROMPTS", "16"))
-N_SAMPLES = int(os.environ.get("NAVI_SAMPLES", "8"))   # per prompt
+import pickle
+import sys
 import time
 
-LR = float(os.environ.get("NAVI_LR", "2e-6"))
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _REPO)
+
+import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
 
+from fineweb_data import BOS, EOS, FineWebFeed
 from navi.config import MemoryConfig, ModelConfig
 from navi.model import Navi
+
 SEQ = int(os.environ.get("NAVI_SEQ", "160"))       # generation context
+GEN_L = int(os.environ.get("NAVI_GEN_L", "48"))     # sampled continuation len
+N_PROMPTS = int(os.environ.get("NAVI_PROMPTS", "16"))
+N_SAMPLES = int(os.environ.get("NAVI_SAMPLES", "8"))   # per prompt
+LR = float(os.environ.get("NAVI_LR", "2e-6"))
 
 TAG = "genpolish"
 T0 = time.time()

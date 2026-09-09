@@ -146,6 +146,10 @@ def main():
     #    fixed shape (SFT_STEPS, BS, SEQ) -> scan input, no recompile.
     #    (windows() returns ids (bs, SEQ) and tg (bs, SEQ) -- the shifted
     #    pair -- so batches are SEQ wide, not SEQ-1.)
+    sft_data = make_docs(600, rng, 1, 50, "chain")
+    replay_data = make_docs(400, rng, 1, 99, "pre")
+    eval_sft_ids, eval_sft_tg = windows(sft_data, rng, EVAL_BS, SEQ)
+    eval_rep_ids, eval_rep_tg = windows(replay_data, rng, EVAL_BS, SEQ)
     all_ids = np.empty((SFT_STEPS, EVAL_BS, SEQ), dtype=np.int32)
     all_tg = np.empty((SFT_STEPS, EVAL_BS, SEQ), dtype=np.int32)
     for s in range(SFT_STEPS):

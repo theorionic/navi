@@ -344,15 +344,31 @@ def main():
             round_body, (pp, o, key), (prompts, targets))
         return pf, rewards, tails
 
-    # prompts: IN-CONTEXT CURRICULUM -- few-shot solved examples prepended
-    # so the RL prompt matches the warmup/packed-text distribution. The
-    # model answers from a context it was actually trained on, and the
-    # examples define the task in-context (no distribution mismatch).
-    #   'BOS 3+4=7 2+5=7 ... a+b='  (fixed P tokens), G completions of L.
-    NCTX = int(os.environ.get("NAVI_NCTX", "3"))     # solved examples
-    PROMPT_LEN = 1 + NCTX * 7 + 4                    # BOS + ctx(7 each) + query
-    assert PROMPT_LEN == 26
-    ab = rng.integers(1, 10, size=(RL_ROUNDS, 2))    # per-round query pair
+    # prompts: RL ON THE FORMAT THE MODEL ACTUALLY LEARNED. TPU diag runs
+    # (diag_rl, diag2) proved P(correct|'a+b=' prompts) <= 4% under every
+    # warmup/temperature -- the model never learned raw-format arithmetic
+    # (its pretrain was FineWeb prose; the small model succeeded only
+    # because ITS pretrain was arithmetic text). But stage-1 SFT taught
+    # 'q:/c:' to 1.42 bpc -- that mapping demonstrably exists. So GRPO
+    # runs on few-shot 'q:/c:' prompts:
+    #   'q: 3+4\nc: 7\nq: 2+5\nc: 7\nq: a+b\nc: '  -> sample '<sum>' etc.
+    # Reward: leading digit run of the completion == sum.
+    # Slot layout: 'q: 3+4\nc: 7\n' = 12 chars (single-digit sums only;
+    # enforced by the ab filter below and ctx sampling).
+    SLOT = 12                                        # 'q: A+B\nc: S\n'
+    PROMPT_LEN = 1 + NCTX * SLOT + 10                # BOS + ctx + 'q: a+b\nc: '
+    assert PROMPT_LEN == 47
+    ab = rng.integers(1, 9, size=(RL_ROUNDS, 2))     # sums 2..17, mostly 1-digit
+    ab = ab[(ab[:, 0] + ab[:, 1] <= 9)]              # keep single-digit sums
+    while len(ab) < RL_ROUNDS:                       # top up
+        more = rng.integers(1, 9, size=(RL_ROUNDS, 2))
+        ab = np.concatenate([ab, more[(more[:, 0] + more[:, 1] <= 9)]])
+    ab = ab[:RL_ROUNDS]
+
+    def qc_slot(a, b):
+        s = f"q: {a}+{b}\nc: {a+b}\n"
+        assert len(s) == SLOT
+        return list(s.encode())
 
     def make_prompts(seed):
         r2 = np.random.default_rng(seed)
@@ -360,20 +376,18 @@ def main():
         for i in range(RL_ROUNDS):
             toks = [256]
             for _ in range(NCTX):
-                a, b = r2.integers(1, 10, 2)
-                s = f"{a}+{b}={a+b} "
-                toks += list(s.encode())
-                if len(s) == 6:            # single-digit sum: pad so every
-                    toks.append(46)        # example is 7 tokens (fixed P)
+                x, y = r2.integers(1, 9, 2)
+                while x + y > 9: x, y = r2.integers(1, 9, 2)
+                toks += qc_slot(int(x), int(y))
             a, b = ab[i]
-            toks += list(f"{a}+{b}=".encode())
+            toks += list(f"q: {a}+{b}\nc: ".encode())
             pr.append(toks)
         return jnp.asarray(pr, dtype=jnp.int32)
 
     prompts = make_prompts(555)
     targets = jnp.asarray(ab[:, 0] + ab[:, 1], dtype=jnp.float32)
     log(f"stage 2: GRPO {RL_ROUNDS} rounds (G={G}, lr {LR_RL}, "
-        f"ent {ENT_BONUS}) on in-context '...a+b=' (ctx {NCTX}) -- single compile")
+        f"ent {ENT_BONUS}) on 'q:/c:' ICL prompts (ctx {NCTX}) -- single compile")
     p, rewards, tails = rl_stage(p, prompts, targets, jax.random.PRNGKey(999))
     r_hist = np.asarray(rewards)          # (RL_ROUNDS, G)
     tails_np = np.asarray(tails)          # (RL_ROUNDS, G, L)
@@ -389,7 +403,8 @@ def main():
 
     # greedy accuracy post-RL: ONE compiled call, vmap over test prompts;
     # greedy decode is a scan over L with a FIXED token-buffer carry.
-    ab_t = rng.integers(1, 10, size=(GREEDY_TESTS, 2))
+    ab_t = rng.integers(1, 9, size=(GREEDY_TESTS * 3, 2))
+    ab_t = ab_t[(ab_t[:, 0] + ab_t[:, 1] <= 9)][:GREEDY_TESTS]
 
     @jax.jit
     def greedy_eval(pp, prompts_t, targets_t):
@@ -423,19 +438,17 @@ def main():
 
         return jax.vmap(one)(prompts_t, targets_t)
 
-    # greedy eval: SAME in-context distribution as training prompts
+    # greedy eval: SAME 'q:/c:' ICL distribution as training prompts
     pr_t = []
     r3 = np.random.default_rng(777)
     for i in range(GREEDY_TESTS):
         toks = [256]
         for _ in range(NCTX):
-            a, b = r3.integers(1, 10, 2)
-            s = f"{a}+{b}={a+b} "
-            toks += list(s.encode())
-            if len(s) == 6:            # same 7-token padding as training
-                toks.append(46)
+            x, y = r3.integers(1, 9, 2)
+            while x + y > 9: x, y = r3.integers(1, 9, 2)
+            toks += qc_slot(int(x), int(y))
         a, b = ab_t[i]
-        toks += list(f"{a}+{b}=".encode())
+        toks += list(f"q: {a}+{b}\nc: ".encode())
         pr_t.append(toks)
     accs = greedy_eval(
         p,

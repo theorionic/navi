@@ -133,6 +133,23 @@ def load_model_and_ckpt():
     return model, p
 
 
+def decode(t):
+    return "".join(chr(c) if 32 <= c < 127 else "?" for c in t)
+
+
+def acc_of(tails, targets):
+    d = tails - 48
+    is_dig = (d >= 0) & (d <= 9)
+    f = np.argmax(~is_dig, axis=-1)
+    f = np.where((~is_dig).any(-1), f, tails.shape[-1])
+    pos = np.arange(tails.shape[-1])
+    in_run = pos[None] < f[:, None]
+    dv = np.where(in_run, np.maximum(d, 0), 0)
+    pw = f[:, None] - 1 - pos[None]
+    sc = np.where(pw >= 0, 10.0 ** np.maximum(pw, 0), 0.0)
+    val = (dv * sc).sum(-1)
+    return float((val == targets).mean())
+
 # ------------------------------------------------------------------ main ----
 def main():
     model, p = load_model_and_ckpt()
@@ -345,7 +362,7 @@ def main():
         return tails
 
     tails_before = np.asarray(greedy_eval(p))
-    acc_before = acc_of(tails_before)
+    acc_before = acc_of(tails_before, np.asarray(test_targets))
     log(f"BEFORE RL: greedy acc {acc_before:.1%} "
         f"tails {[decode(t) for t in tails_before[:3]]}")
 
@@ -360,7 +377,7 @@ def main():
             f"tails={[decode(t) for t in tails_np[rnd, :3]]}")
 
     tails_after = np.asarray(greedy_eval(p))
-    acc_after = acc_of(tails_after)
+    acc_after = acc_of(tails_after, np.asarray(test_targets))
     log(f"AFTER RL:  greedy acc {acc_after:.1%} "
         f"tails {[decode(t) for t in tails_after[:3]]}")
 

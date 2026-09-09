@@ -344,13 +344,36 @@ def main():
             round_body, (pp, o, key), (prompts, targets))
         return pf, rewards, tails
 
-    # prompts: BOS + 'a+b=' (fixed 5 tokens), targets: a+b
-    ab = rng.integers(1, 10, size=(RL_ROUNDS, 2))
-    prompts = jnp.asarray(
-        [[256] + list(f"{a}+{b}=".encode()) for a, b in ab], dtype=jnp.int32)
+    # prompts: IN-CONTEXT CURRICULUM -- few-shot solved examples prepended
+    # so the RL prompt matches the warmup/packed-text distribution. The
+    # model answers from a context it was actually trained on, and the
+    # examples define the task in-context (no distribution mismatch).
+    #   'BOS 3+4=7 2+5=7 ... a+b='  (fixed P tokens), G completions of L.
+    NCTX = int(os.environ.get("NAVI_NCTX", "3"))     # solved examples
+    PROMPT_LEN = 1 + NCTX * 7 + 4                    # BOS + ctx(7 each) + query
+    assert PROMPT_LEN == 26
+    ab = rng.integers(1, 10, size=(RL_ROUNDS, 2))    # per-round query pair
+
+    def make_prompts(seed):
+        r2 = np.random.default_rng(seed)
+        pr = []
+        for i in range(RL_ROUNDS):
+            toks = [256]
+            for _ in range(NCTX):
+                a, b = r2.integers(1, 10, 2)
+                s = f"{a}+{b}={a+b} "
+                toks += list(s.encode())
+                if len(s) == 6:            # single-digit sum: pad so every
+                    toks.append(46)        # example is 7 tokens (fixed P)
+            a, b = ab[i]
+            toks += list(f"{a}+{b}=".encode())
+            pr.append(toks)
+        return jnp.asarray(pr, dtype=jnp.int32)
+
+    prompts = make_prompts(555)
     targets = jnp.asarray(ab[:, 0] + ab[:, 1], dtype=jnp.float32)
     log(f"stage 2: GRPO {RL_ROUNDS} rounds (G={G}, lr {LR_RL}, "
-        f"ent {ENT_BONUS}) on 'a+b=' single-digit -- single compile")
+        f"ent {ENT_BONUS}) on in-context '...a+b=' (ctx {NCTX}) -- single compile")
     p, rewards, tails = rl_stage(p, prompts, targets, jax.random.PRNGKey(999))
     r_hist = np.asarray(rewards)          # (RL_ROUNDS, G)
     tails_np = np.asarray(tails)          # (RL_ROUNDS, G, L)
@@ -400,10 +423,23 @@ def main():
 
         return jax.vmap(one)(prompts_t, targets_t)
 
+    # greedy eval: SAME in-context distribution as training prompts
+    pr_t = []
+    r3 = np.random.default_rng(777)
+    for i in range(GREEDY_TESTS):
+        toks = [256]
+        for _ in range(NCTX):
+            a, b = r3.integers(1, 10, 2)
+            s = f"{a}+{b}={a+b} "
+            toks += list(s.encode())
+            if len(s) == 6:            # same 7-token padding as training
+                toks.append(46)
+        a, b = ab_t[i]
+        toks += list(f"{a}+{b}=".encode())
+        pr_t.append(toks)
     accs = greedy_eval(
         p,
-        jnp.asarray([[256] + list(f"{a}+{b}=".encode())
-                     for a, b in ab_t], dtype=jnp.int32),
+        jnp.asarray(pr_t, dtype=jnp.int32),
         jnp.asarray((ab_t[:, 0] + ab_t[:, 1]).astype(np.float32)))
     rl_acc = float(np.mean(np.asarray(accs)))
     core2, mem2, val2 = param_snapshot(p)

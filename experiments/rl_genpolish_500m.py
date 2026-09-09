@@ -249,7 +249,6 @@ def main():
         P = prompts.shape[1]
         def one_prompt(pr, ln, k1):
             pf = jnp.tile(pr, (N_SAMPLES, 1))
-            lf = jnp.full((N_SAMPLES,), ln, jnp.int32)
 
             def gstep(carry, t):
                 buf, kk = carry

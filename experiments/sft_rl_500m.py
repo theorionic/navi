@@ -257,7 +257,26 @@ def main():
             return jnp.concatenate([pf, toks], axis=1)       # (G, P+L)
 
         def reward_of(tails, target):
-            """Leading digit run -> value; 1.0 exact, 0.2 any-digits, else 0."""
+            """Leading digit run -> value; 1.0 exact, 0.2 any-digits, else 0.
+            Pure tensor math: first nondigit via argmax, place-value
+            decode via powers of 10 (parity-verified vs python ref)."""
+            d = tails - 48
+            is_dig = (d >= 0) & (d <= 9)
+            nondig = ~is_dig
+            f = jnp.argmax(nondig, axis=-1)              # first nondigit
+            f = jnp.where(nondig.any(-1), f, L)          # all-digits -> L
+            pos = jnp.arange(L)
+            in_run = pos[None] < f[:, None]
+            dv = jnp.where(in_run, jnp.maximum(d, 0), 0)
+            pw = f[:, None] - 1 - pos[None]
+            scale = jnp.where(pw >= 0, 10.0 ** jnp.maximum(pw, 0), 0.0)
+            val = (dv * scale).sum(-1)                   # (G,)
+            return jnp.where(val == target, 1.0,
+                             jnp.where(f > 0, 0.2, 0.0))
+
+        def round_body(carry, prompt_target):
+            """One GRPO round: sample G completions, tensor-math reward,
+            group-relative advantage, PG + entropy gradient, AdamW."""
             q, oo, kk = carry
             prompt, target = prompt_target
             kk, ksub = jax.random.split(kk)

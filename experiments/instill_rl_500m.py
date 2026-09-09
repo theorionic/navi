@@ -190,7 +190,7 @@ def main():
         logits = jax.vmap(lambda pr: model.apply(pp, pr[None], train=False)[0])(
             probe_prompts)
         logp = jax.nn.log_softmax(logits[:, -1, :])
-        return jnp.exp(logp[jnp.arange(64), probe_targets.astype(jnp.int32)])
+        return jnp.exp(logp[jnp.arange(64), (48 + probe_targets).astype(jnp.int32)])
 
     p_corr_hist = []
     best_p, best_p_params, best_seg = -1.0, None, -1
@@ -365,6 +365,10 @@ def main():
     acc_before = acc_of(tails_before, np.asarray(test_targets))
     log(f"BEFORE RL: greedy acc {acc_before:.1%} "
         f"tails {[decode(t) for t in tails_before[:3]]}")
+
+    rl_prompts, rl_targets = make_prompt_batch(555, B_ROUNDS)
+    log(f"stage B: GRPO {B_ROUNDS} rounds (G={G}, ent {ENT_BONUS}) "
+        f"on the same ICL prompts -- single compile")
 
     p, rewards, tails = rl_stage(p, rl_prompts, rl_targets,
                                  jax.random.PRNGKey(999))

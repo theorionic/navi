@@ -222,7 +222,7 @@ def main():
     # FIXED shape (40 wide). Chunk is RIGHT-ALIGNED: EOS left-padding is
     # in-distribution (pretrain stream is ...EOS BOS bytes...), and
     # sampling always starts at the last window byte.
-    val_bytes = feed.val.array()
+    val_bytes = np.asarray(feed.val.array(), dtype=np.uint8)
     FIXPL = 40                                  # [BOS] + <=39 chunk bytes
     def make_prompts(n, seed):
         r2 = np.random.default_rng(seed)

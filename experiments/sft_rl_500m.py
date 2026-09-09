@@ -254,10 +254,10 @@ def main():
         jax.device_put(all_wids, BSTACK),
         jax.device_put(all_wtg, BSTACK))
     wl = np.asarray(warm_losses)
+    wmarks = sorted(set([0, WARM_STEPS // 4, WARM_STEPS // 2,
+                         3 * WARM_STEPS // 4, WARM_STEPS - 1]))
     log("  warm-loss curve: " +
-        " ".join(f"@{m}:{wl[m]:.3f}" for m in marks))
-    log(f"  end: raw-fmt bpc {bpc_of(p, eval_raw_ids, eval_raw_tg):.3f} | "
-        f"replay-fmt {bpc_of(p, eval_rep_ids, eval_rep_tg):.3f}")
+        " ".join(f"@{m}:{wl[m]:.3f}" for m in wmarks))
 
     # 4. GRPO RL stage: ONE compiled lax.scan over all rounds.
     tx2 = optax.adamw(LR_RL, b1=0.9, b2=0.95)

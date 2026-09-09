@@ -69,12 +69,7 @@ def log(msg):
 
 
 # ---------------------------------------------------------------- config ----
-SEQ = 256                      # generation context (fits (N, SEQ) apply)
 ROUNDS = int(os.environ.get("NAVI_POLISH_ROUNDS", "200"))
-GEN_L = int(os.environ.get("NAVI_GEN_L", "64"))     # sampled continuation len
-N_PROMPTS = int(os.environ.get("NAVI_PROMPTS", "32"))
-N_SAMPLES = int(os.environ.get("NAVI_SAMPLES", "16"))  # per prompt
-LR = float(os.environ.get("NAVI_LR", "2e-6"))
 ENT_FLOOR = 0.0                # optional entropy bonus (0 = off)
 EVAL_TESTS = 24
 

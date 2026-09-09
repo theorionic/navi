@@ -65,6 +65,8 @@ GREEDY_TESTS = 40
 mesh = jax.sharding.Mesh(jax.local_devices(), ("cores",))
 REPL = jax.sharding.NamedSharding(mesh, jax.sharding.PartitionSpec())
 BATCH = jax.sharding.NamedSharding(mesh, jax.sharding.PartitionSpec("cores"))
+BSTACK = jax.sharding.NamedSharding(
+    mesh, jax.sharding.PartitionSpec(None, "cores", None))
 
 
 def shard_tree(tree):
@@ -203,8 +205,8 @@ def main():
     log(f"  start: sft-fmt bpc {bpc_sft0:.3f} | replay-fmt bpc {bpc_pre0:.3f}")
     p, train_losses = sft_stage(
         p,
-        jax.device_put(all_ids, BATCH),
-        jax.device_put(all_tg, BATCH))
+        jax.device_put(all_ids, BSTACK),
+        jax.device_put(all_tg, BSTACK))
     tl = np.asarray(train_losses)
     marks = sorted(set([0, SFT_STEPS // 4, SFT_STEPS // 2,
                         3 * SFT_STEPS // 4, SFT_STEPS - 1]))

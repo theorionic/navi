@@ -58,7 +58,7 @@ REPLAY_FRAC = float(os.environ.get("NAVI_REPLAY", "0.5"))
 G = 8                          # GRPO group size
 L = 4                          # completion length (tokens)
 LR_SFT = 5e-5                  # 10x below small-model: 556M params
-LR_RL = 1e-5
+LR_RL = float(os.environ.get("NAVI_RL_LR", "1e-5"))
 ENT_BONUS = 0.01               # entropy regularizer (anti-mode-collapse)
 GREEDY_TESTS = 40
 
@@ -210,10 +210,11 @@ def main():
         jax.device_put(all_ids, BSTACK),
         jax.device_put(all_tg, BSTACK))
     tl = np.asarray(train_losses)
-    marks = sorted(set([0, SFT_STEPS // 4, SFT_STEPS // 2,
-                        3 * SFT_STEPS // 4, SFT_STEPS - 1]))
-    log("  train-loss curve: " +
-        " ".join(f"@{m}:{tl[m]:.3f}" for m in marks))
+    if SFT_STEPS > 0:
+        marks = sorted(set([0, SFT_STEPS // 4, SFT_STEPS // 2,
+                            3 * SFT_STEPS // 4, SFT_STEPS - 1]))
+        log("  train-loss curve: " +
+            " ".join(f"@{m}:{tl[m]:.3f}" for m in marks))
     bpc_sft1 = bpc_of(p, eval_sft_ids, eval_sft_tg)
     bpc_pre1 = bpc_of(p, eval_rep_ids, eval_rep_tg)
     core1, mem1, val1 = param_snapshot(p)

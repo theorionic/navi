@@ -1,0 +1,4 @@
+v5 independent A/B (fresh prompts, seed 1234, different data windows than run eval):
+FRESH-PROMPT lexical reward before: 0.5421504378318787 after: 0.5766844153404236  (+0.035)
+Combined with v5 verdict: bpc 6.3538 -> 6.3043 (improved), ref logp -4.475 -> -4.437.
+Polished params: /kaggle/working/genpolish_params.pkl md5 03298228e4559ee014a20802939ee278

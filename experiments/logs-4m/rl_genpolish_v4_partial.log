@@ -1,0 +1,15 @@
+/usr/local/lib/python3.12/site-packages/jax/_src/cloud_tpu_init.py:90: UserWarning: Transparent hugepages are not enabled. TPU runtime startup and shutdown time should be significantly improved on TPU v5e and newer. If not already set, you may need to enable transparent hugepages in your VM image (sudo sh -c "echo always > /sys/kernel/mm/transparent_hugepage/enabled")
+  warnings.warn(
+WARNING: Logging before InitGoogle() is written to STDERR
+E0000 00:00:1789034534.377783   53974 common_lib.cc:648] Could not set metric server port: INVALID_ARGUMENT: Could not find SliceBuilder port 8471 in any of the 0 ports provided in `tpu_process_addresses`="local"
+=== Source Location Trace: ===
+learning/45eac/tfrc/runtime/common_lib.cc:238
+[genpolish +  13.6s] loaded ckpt_500m_step019999.pkl
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[genpolish + 366.9s] BEFORE: mean quality reward 0.550 (ascii/word/loop mix; tails below)
+[genpolish + 366.9s]   pre sample: ' giiiiii, aspira bra scraff Ala Blooth Captannons can providing a scraff! The Last Fug Benefits last St costs alst also 1sslscwc'
+[genpolish + 366.9s]   pre sample: ' giant first dwell and providing the home to consume its ricccon..TV College collage gife its College NUE:.So the 7,828 1sswtcw/'
+[genpolish + 366.9s]   pre sample: ' giving your dwx brands, blue and teaching necessite in home conferring with circage given the like like friendly. You wiiiiiiii'
+[genpolish + 367.1s] arm RL: 20 rounds x 16 prompts x 8 samples (GEN_L=128, REF_W=0.3)
+[genpolish + 793.2s]   polish   0: batch reward 0.377
+[genpolish +1449.0s]   polish   2: batch reward 0.378

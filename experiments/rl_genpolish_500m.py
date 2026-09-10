@@ -316,33 +316,9 @@ def main():
 
 
 
-    def run_polish(pp, oo):
-        hist = []
-        for rnd in range(ROUNDS):
-            pr_arr = make_prompts(N_PROMPTS, 1000 + rnd)
-            kk2, sub = jax.random.split(kk)
-            grads = None
-            r_mean_acc = 0.0
-            C = 4                                       # prompts per chunk
-            n_chunks = N_PROMPTS // C
-            for c in range(N_PROMPTS // C):
-                sl = slice(c * C, (c + 1) * C)
-                kk2, sub = jax.random.split(kk2)
-                g_c, rm_c = polish_chunk_jit(pp, pp0, pr_arr[sl], sub)
-                grads = g_c if grads is None else jax.tree_util.tree_map(
-                    jnp.add, grads, g_c)
-                r_mean_acc += float(rm_c)
-            rm = r_mean_acc / (N_PROMPTS // C)
-            u, oo = tx.update(grads, oo, pp)
-            hist.append(rm)
-            if rnd % 2 == 0 or rnd == ROUNDS - 1:
-                log(f"  polish {rnd:3d}: batch reward {rm:.3f}")
-        return pp, oo, hist
-
-
     pp0 = shard_tree(jax.device_get(p))         # frozen pretrained ref
 
-    def polish_chunk_jit(pp, pp0, prompts, kk):
+    def polish_chunk_jit(pp, pp0, oo, prompts, kk):
         def one_prompt(pr, k1):
             def gstep(carry, t):
                 buf, k2 = carry
@@ -395,7 +371,32 @@ def main():
             return pg
 
         g = jax.grad(loss_fn)(pp)
-        return g, r.mean()
+        # FUSED UPDATE: apply optax INSIDE the jit so the gradient
+        # never crosses the pybind boundary in a pytree. (Probe proved
+        # grad norm 6.11 -- healthy -- yet weights ended bit-identical
+        # after 20 rounds: crossing the update path on this jax build
+        # dropped them. Keeping state on-device fixes that.)
+        u, oo2 = tx.update(g, oo, pp)
+        pp2 = optax.apply_updates(pp, u)
+        return pp2, oo2, r.mean()
+
+    def run_polish(pp, oo):
+        hist = []
+        for rnd in range(ROUNDS):
+            pr_arr = make_prompts(N_PROMPTS, 1000 + rnd)
+            r_mean_acc = 0.0
+            C = 4                                       # prompts per chunk
+            for c in range(N_PROMPTS // C):
+                sl = slice(c * C, (c + 1) * C)
+                kk, sub = jax.random.split(kk)
+                pp, oo, rm_c = polish_chunk_jit(
+                    pp, pp0, oo, pr_arr[sl], sub)
+                r_mean_acc += float(rm_c)
+            rm = r_mean_acc / (N_PROMPTS // C)
+            hist.append(rm)
+            if rnd % 2 == 0 or rnd == ROUNDS - 1:
+                log(f"  polish {rnd:3d}: batch reward {rm:.3f}")
+        return pp, oo, hist
 
     log(f"arm RL: {ROUNDS} rounds x {N_PROMPTS} prompts x {N_SAMPLES} "
         f"samples (GEN_L={GEN_L}, REF_W={REF_W})")

@@ -214,11 +214,17 @@ def quality_reward(tails, ref_logp=None):
 
 
 def main():
-    ckpt = sorted(
-        f for f in os.listdir('/kaggle/working/experiments')
-        if f.startswith('ckpt_500m_step') and f.endswith('.pkl'))[-1]
-    with open(f'/kaggle/working/experiments/{ckpt}', 'rb') as f:
-        p = pickle.load(f)['params']
+    resume = os.environ.get("NAVI_RESUME_POLISHED", "")
+    if resume:
+        with open(resume, 'rb') as f:
+            p = pickle.load(f)['params']
+        ckpt = os.path.basename(resume)
+    else:
+        ckpt = sorted(
+            f for f in os.listdir('/kaggle/working/experiments')
+            if f.startswith('ckpt_500m_step') and f.endswith('.pkl'))[-1]
+        with open(f'/kaggle/working/experiments/{ckpt}', 'rb') as f:
+            p = pickle.load(f)['params']
     mem_cfg = MemoryConfig(c1=512, c2=512, cand_k=8, side_top=64,
                            n_classes=4, score_temp=4.0)
     cfg_m = ModelConfig(d_model=512, n_layers=8, n_heads=8, memory_every=2,

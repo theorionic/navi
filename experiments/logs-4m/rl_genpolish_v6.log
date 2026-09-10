@@ -1,0 +1,41 @@
+/usr/local/lib/python3.12/site-packages/jax/_src/cloud_tpu_init.py:90: UserWarning: Transparent hugepages are not enabled. TPU runtime startup and shutdown time should be significantly improved on TPU v5e and newer. If not already set, you may need to enable transparent hugepages in your VM image (sudo sh -c "echo always > /sys/kernel/mm/transparent_hugepage/enabled")
+  warnings.warn(
+WARNING: Logging before InitGoogle() is written to STDERR
+E0000 00:00:1789058903.576904   39760 common_lib.cc:648] Could not set metric server port: INVALID_ARGUMENT: Could not find SliceBuilder port 8471 in any of the 0 ports provided in `tpu_process_addresses`="local"
+=== Source Location Trace: === 
+learning/45eac/tfrc/runtime/common_lib.cc:238
+[genpolish +  11.5s] loaded genpolish_params.pkl
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[genpolish + 367.3s] BEFORE: mean quality reward 0.562 (ascii/word/loop mix; tails below)
+[genpolish + 367.3s]   pre sample: ' giiiiii, aspira bra reports who he thought he reports in Johnny..TV Cannon Waissa Fuj Benefits lead a Ucoss Canne Your SDrWCSSC'
+[genpolish + 367.3s]   pre sample: ' giant fires dwell and providing the home to consume its rittage..TV College collage gife its College NUE:.So the 7 giantttttttt'
+[genpolish + 367.3s]   pre sample: ' giving your dwe brands, but you think making your exiting the same about the issues given the like the cost of streeth yiratcic'
+[genpolish + 367.4s] arm RL: 36 rounds x 16 prompts x 8 samples (GEN_L=128, REF_W=0.3)
+[genpolish + 802.4s]   polish   0: batch reward 0.396
+[genpolish +1475.0s]   polish   2: batch reward 0.397
+[genpolish +2149.8s]   polish   4: batch reward 0.409
+[genpolish +2818.5s]   polish   6: batch reward 0.392
+[genpolish +3502.8s]   polish   8: batch reward 0.391
+[genpolish +4173.0s]   polish  10: batch reward 0.400
+[genpolish +4858.2s]   polish  12: batch reward 0.414
+[genpolish +5534.6s]   polish  14: batch reward 0.405
+[genpolish +6209.1s]   polish  16: batch reward 0.404
+[genpolish +6875.3s]   polish  18: batch reward 0.388
+[genpolish +7549.7s]   polish  20: batch reward 0.410
+[genpolish +8227.0s]   polish  22: batch reward 0.416
+[genpolish +8892.6s]   polish  24: batch reward 0.398
+[genpolish +9571.1s]   polish  26: batch reward 0.414
+[genpolish +10250.2s]   polish  28: batch reward 0.417
+[genpolish +10922.8s]   polish  30: batch reward 0.413
+[genpolish +11599.3s]   polish  32: batch reward 0.412
+[genpolish +12271.4s]   polish  34: batch reward 0.416
+[genpolish +12606.8s]   polish  35: batch reward 0.415
+/usr/local/lib/python3.12/site-packages/jax/_src/interpreters/mlir.py:1286: UserWarning: A large amount of constants were captured during lowering (2.24GB total). If this is intentional, disable this warning by setting JAX_CAPTURED_CONSTANTS_WARN_BYTES=-1. To obtain a report of where these constants were encountered, set JAX_CAPTURED_CONSTANTS_REPORT_FRAMES=-1.
+  warnings.warn(message)
+[genpolish +12992.5s] AFTER: mean quality reward 0.594 (before 0.562) ref logp/byte -4.391
+[genpolish +12992.5s]   post sample: ' giiiiiiiiis dwell and pacccccaptchi has punness del in health she was love this app gife intensity the cosisists interioasammoo'
+[genpolish +12992.5s]   post sample: ' giant first dwell and pack in Caliiiiiiiiii. In the init it can a Valleri strike is gife it is larger gufficicicicial instntnnn'
+[genpolish +12992.5s]   post sample: ' giving your dwe transmitter? What it have no supporting ricccon..TV College collage gife is internal truffick like a hilsslslll'
+[genpolish +13006.4s] teacher-forced val bpc: 6.3043 -> 6.2453
+[genpolish +13006.4s] VERDICT: RL polish WORKS (reward 0.562->0.594, bpc 6.304->6.245)
+[genpolish +13011.0s] saved /kaggle/working/genpolish_params.pkl

@@ -1,0 +1,33 @@
+/usr/local/lib/python3.12/site-packages/jax/_src/cloud_tpu_init.py:90: UserWarning: Transparent hugepages are not enabled. TPU runtime startup and shutdown time should be significantly improved on TPU v5e and newer. If not already set, you may need to enable transparent hugepages in your VM image (sudo sh -c "echo always > /sys/kernel/mm/transparent_hugepage/enabled")
+  warnings.warn(
+WARNING: Logging before InitGoogle() is written to STDERR
+E0000 00:00:1789050085.194566   21107 common_lib.cc:648] Could not set metric server port: INVALID_ARGUMENT: Could not find SliceBuilder port 8471 in any of the 0 ports provided in `tpu_process_addresses`="local"
+=== Source Location Trace: === 
+learning/45eac/tfrc/runtime/common_lib.cc:238
+[genpolish +  12.0s] loaded ckpt_500m_step019999.pkl
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[genpolish + 366.2s] BEFORE: mean quality reward 0.550 (ascii/word/loop mix; tails below)
+[genpolish + 366.2s]   pre sample: ' giiiiii, aspira bra scraff Ala Blooth Captannons can providing a scraff! The Last Fug Benefits last St costs alst also 1sslscwc'
+[genpolish + 366.2s]   pre sample: ' giant first dwell and providing the home to consume its ricccon..TV College collage gife its College NUE:.So the 7,828 1sswtcw/'
+[genpolish + 366.2s]   pre sample: ' giving your dwx brands, blue and teaching necessite in home conferring with circage given the like like friendly. You wiiiiiiii'
+[genpolish + 366.5s] arm RL: 20 rounds x 16 prompts x 8 samples (GEN_L=128, REF_W=0.3)
+[genpolish + 794.0s]   polish   0: batch reward 0.378
+[genpolish +1450.7s]   polish   2: batch reward 0.364
+[genpolish +2110.7s]   polish   4: batch reward 0.392
+[genpolish +2797.6s]   polish   6: batch reward 0.385
+[genpolish +3479.3s]   polish   8: batch reward 0.379
+[genpolish +4154.7s]   polish  10: batch reward 0.400
+[genpolish +4837.1s]   polish  12: batch reward 0.391
+[genpolish +5518.5s]   polish  14: batch reward 0.392
+[genpolish +6200.4s]   polish  16: batch reward 0.379
+[genpolish +6876.4s]   polish  18: batch reward 0.372
+[genpolish +7220.1s]   polish  19: batch reward 0.394
+/usr/local/lib/python3.12/site-packages/jax/_src/interpreters/mlir.py:1286: UserWarning: A large amount of constants were captured during lowering (2.24GB total). If this is intentional, disable this warning by setting JAX_CAPTURED_CONSTANTS_WARN_BYTES=-1. To obtain a report of where these constants were encountered, set JAX_CAPTURED_CONSTANTS_REPORT_FRAMES=-1.
+  warnings.warn(message)
+[genpolish +7604.4s] AFTER: mean quality reward 0.562 (before 0.550) ref logp/byte -4.437
+[genpolish +7604.4s]   post sample: ' giiiiii, aspira bra reports who he thought he reports in Johnny..TV Cannon Waissa Fuj Benefits lead a Ucoss Canne Your SDrWCSSC'
+[genpolish +7604.4s]   post sample: ' giant fires dwell and providing the home to consume its rittage..TV College collage gife its College NUE:.So the 7 giantttttttt'
+[genpolish +7604.4s]   post sample: ' giving your dwe brands, but you think making your exiting the same about the issues given the like the cost of streeth yiratcic'
+[genpolish +7617.8s] teacher-forced val bpc: 6.3538 -> 6.3043
+[genpolish +7617.8s] VERDICT: RL polish NO GAIN (reward 0.550->0.562, bpc 6.354->6.304)
+[genpolish +7624.2s] saved /kaggle/working/genpolish_params.pkl

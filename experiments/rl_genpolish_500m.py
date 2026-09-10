@@ -384,11 +384,12 @@ def main():
         hist = []
         for rnd in range(ROUNDS):
             pr_arr = make_prompts(N_PROMPTS, 1000 + rnd)
+            kk2 = kk
             r_mean_acc = 0.0
             C = 4                                       # prompts per chunk
             for c in range(N_PROMPTS // C):
                 sl = slice(c * C, (c + 1) * C)
-                kk, sub = jax.random.split(kk)
+                kk2, sub = jax.random.split(kk2)
                 pp, oo, rm_c = polish_chunk_jit(
                     pp, pp0, oo, pr_arr[sl], sub)
                 r_mean_acc += float(rm_c)

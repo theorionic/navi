@@ -270,6 +270,7 @@ def main():
                   f"(sharded onto mesh)", flush=True)
     t0 = time.time()
     losses = []
+    gn_hist = []  # (step, core_gnorm, mem_gnorm) - trend between log points
     val_hist = []  # (step, val_bpc) - tracked at every gen point
     vb = feed.val.array()
     print(f"[{TAG}] val buffer {len(vb)/1024/1024:.1f}MB held out", flush=True)

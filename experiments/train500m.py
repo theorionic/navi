@@ -105,7 +105,7 @@ def loss_fn(model, p, ids, tg, temp=None):
     if temp is None:
         logits = model.apply(p, ids, train=True)
     else:
-        logits = model.apply(p, ids, temp, train=True)
+        logits = model.apply(p, ids, True, temp)
     return optax.softmax_cross_entropy_with_integer_labels(logits, tg).mean()
 
 

@@ -86,6 +86,8 @@ class Navi(nn.Module):
     def __call__(self, ids: Array, train: bool = False, mem_temp=None) -> Array | tuple[Array, dict[str, Array]]:
         if mem_temp is None:
             mem_temp = self.mem_cfg.score_temp
+        x = self.embed(ids) * jnp.sqrt(float(self.cfg.d_model))
+        x = x + _sin_pe(ids.shape[1], self.cfg.d_model)
         aux: dict[str, Array] = {}
         for i, block in enumerate(self.blocks):
             if self.return_aux and block.use_memory:

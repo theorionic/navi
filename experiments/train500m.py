@@ -99,9 +99,13 @@ def temp_at(step_i):
     f = min(1.0, step_i / TEMP_WARMUP)
     return TEMP_START + f * (TEMP_END - TEMP_START)
 
-
 def loss_fn(model, p, ids, tg, temp=None):
-    logits = model.apply(p, ids, train=True, mem_temp=temp)
+    # mem_temp must be POSITIONAL: flax 0.12 mis-traces dynamic kwargs
+    # under grad ("NoneType is not iterable")
+    if temp is None:
+        logits = model.apply(p, ids, train=True)
+    else:
+        logits = model.apply(p, ids, temp, train=True)
     return optax.softmax_cross_entropy_with_integer_labels(logits, tg).mean()
 
 

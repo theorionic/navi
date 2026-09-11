@@ -41,12 +41,12 @@ class Block(nn.Module):
             self.ff = nn.Dense(4 * self.cfg.d_model, name="ff_in")
             self.ff_out = nn.Dense(self.cfg.d_model, name="ff_out")
 
-    def __call__(self, x: Array, train: bool = False, ctx_ids: Array | None = None) -> Array | tuple[Array, Array]:
+    def __call__(self, x: Array, train: bool = False, ctx_ids: Array | None = None, mem_temp=None) -> Array | tuple[Array, Array]:
         mask = nn.attention.make_causal_mask(jnp.ones((x.shape[1],), dtype=jnp.bool_))
         x = x + self.attn(self.ln1(x), mask=mask)
         h = self.ln2(x)
         if self.use_memory:
-            out, m = self.mem(h, train, ctx_ids=ctx_ids)
+            out, m = self.mem(h, train, ctx_ids=ctx_ids, temp=mem_temp)
             out = out.reshape(x.shape)
             if self.return_aux:
                 slots = m["slots"].reshape(x.shape[0], x.shape[1], -1)
@@ -78,16 +78,16 @@ class Navi(nn.Module):
         self.ln_f = nn.LayerNorm()
         self.head = nn.Dense(self.cfg.vocab_size, use_bias=False, name="head")
 
-    def __call__(self, ids: Array, train: bool = False) -> Array | tuple[Array, dict[str, Array]]:
+    def __call__(self, ids: Array, train: bool = False, mem_temp=None) -> Array | tuple[Array, dict[str, Array]]:
         x = self.embed(ids) * jnp.sqrt(float(self.cfg.d_model))
         x = x + _sin_pe(x.shape[1], self.cfg.d_model)
         aux: dict[str, Array] = {}
         for i, block in enumerate(self.blocks):
             if self.return_aux and block.use_memory:
-                x, slots = block(x, train, ctx_ids=ids)
+                x, slots = block(x, train, ctx_ids=ids, mem_temp=mem_temp)
                 aux[f"mem_{i}"] = slots
             else:
-                x = block(x, train, ctx_ids=ids)
+                x = block(x, train, ctx_ids=ids, mem_temp=mem_temp)
         logits = self.head(self.ln_f(x))
         return (logits, aux) if self.return_aux else logits
 

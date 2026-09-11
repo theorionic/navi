@@ -48,7 +48,7 @@ class ProductKeyMemory(nn.Module):
             (c.n_classes, c.c1 * c.c2, self.per_class_dim),
         )
 
-    def __call__(self, x, train=False, ctx_ids=None):
+    def __call__(self, x, train=False, ctx_ids=None, temp=None):
         """ctx_ids: (b, l) token IDs of this block's input context. Required
         when cfg.hash_slots -- slot candidates are hash(ctx_ids) mod slots,
         so each (key,n1,n2) context maps to fixed value rows on first touch
@@ -80,7 +80,7 @@ class ProductKeyMemory(nn.Module):
         slots = pi1 * c.c2 + pi2
         scores = jnp.take_along_axis(flat, f_idx, -1)
         v = self.values[jnp.arange(c.n_classes)[None, None, :, None], slots]
-        w = jax.nn.softmax(c.score_temp * scores, axis=-1)
+        w = jax.nn.softmax((c.score_temp if temp is None else temp) * scores, axis=-1)
         h = (w[..., None] * v).sum(axis=-2)
         h = h.reshape(b, l, c.n_classes * self.per_class_dim)
         return self.w_o(h), {"slots": slots.reshape(b, l, -1), "scores": scores.reshape(b, l, -1)}

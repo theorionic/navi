@@ -37,6 +37,13 @@ BS = int(os.environ.get("NAVI_BS", "256"))
 SEQ = int(os.environ.get("NAVI_SEQ", "512"))
 GEN_EVERY = int(os.environ.get("NAVI_GEN_EVERY", "1000"))
 GEN_LEN = 256
+# routing-fix levers: cand_k widens the gradient funnel; score_temp
+# anneals 1.0 (flat, exploratory) -> NAVI_TEMP_END (sharp, exploit)
+# over NAVI_TEMP_WARMUP steps. Baseline (master): cand_k=8, temp=4.0.
+CAND_K = int(os.environ.get("NAVI_CAND_K", "8"))
+TEMP_START = float(os.environ.get("NAVI_TEMP_START", "4.0"))
+TEMP_END = float(os.environ.get("NAVI_TEMP_END", "4.0"))
+TEMP_WARMUP = int(os.environ.get("NAVI_TEMP_WARMUP", "3000"))
 CKPT = os.path.expanduser("~/experiments/ckpt_500m.pkl")
 
 mesh = jax.sharding.Mesh(jax.local_devices(), ("cores",))
@@ -85,8 +92,16 @@ def grad_norm(g):
     return float(jnp.sqrt(sq)), n
 
 
-def loss_fn(model, p, ids, tg):
-    logits = model.apply(p, ids, train=True)
+def temp_at(step_i):
+    """Linear score_temp anneal TEMP_START -> TEMP_END over TEMP_WARMUP."""
+    if TEMP_WARMUP <= 0 or TEMP_START == TEMP_END:
+        return TEMP_END
+    f = min(1.0, step_i / TEMP_WARMUP)
+    return TEMP_START + f * (TEMP_END - TEMP_START)
+
+
+def loss_fn(model, p, ids, tg, temp=None):
+    logits = model.apply(p, ids, train=True, mem_temp=temp)
     return optax.softmax_cross_entropy_with_integer_labels(logits, tg).mean()
 
 
@@ -179,10 +194,8 @@ def val_loss(model, params, val_bytes, n_batches=8):
 def main():
     print(f"== 500m: BS={BS} SEQ={SEQ} STEPS={STEPS} gen@{GEN_EVERY} "
           f"cores={jax.device_count()} ==", flush=True)
-    mem_cfg = MemoryConfig(c1=512, c2=512, cand_k=8, side_top=64, n_classes=4,
-                           score_temp=4.0)
-    cfg_m = ModelConfig(d_model=512, n_layers=8, n_heads=8, memory_every=2,
-                        vocab_size=260)
+    mem_cfg = MemoryConfig(c1=512, c2=512, cand_k=CAND_K, side_top=64, n_classes=4,
+                           score_temp=TEMP_END)
     model = Navi(cfg_m, mem_cfg)
     p0 = init_params(model, SEQ, jax.random.PRNGKey(0))
     flat = jax.tree_util.tree_flatten_with_path(p0)[0]
@@ -203,8 +216,8 @@ def main():
     rng = np.random.default_rng(0)
 
     @jax.jit
-    def step(pp, oo, ids, tg):
-        g = jax.grad(lambda q, a, t: loss_fn(model, q, a, t))(pp, ids, tg)
+    def step(pp, oo, ids, tg, temp):
+        g = jax.grad(lambda q, a, t: loss_fn(model, q, a, t, temp))(pp, ids, tg)
         # split grads: mem (values/keys) vs core for separate norm logging
         gm = jax.tree_util.tree_map_with_path(
             lambda kp, x: x if is_mem(kp) else jnp.zeros_like(x), g)
@@ -247,9 +260,9 @@ def main():
         win = feed.batch(rng, BS, SEQ)
         ids = jax.device_put(win[:, :-1], BATCH)
         tg = jax.device_put(win[:, 1:], BATCH)
-        p, o, (gn_core, gn_mem) = step(p, o, ids, tg)
+        p, o, (gn_core, gn_mem) = step(p, o, ids, tg, temp_at(i))
         if i % 50 == 0 or i == STEPS - 1:
-            l = float(loss_fn(model, p, ids, tg))
+            l = float(loss_fn(model, p, ids, tg, temp_at(i)))
             losses.append(l)
             tps = (i - start + 1) * BS * SEQ / max(1e-9, time.time() - t0)
             eta_s = (STEPS - i - 1) * BS * SEQ / max(1e-9, tps)

@@ -41,7 +41,12 @@ class Block(nn.Module):
             self.ff = nn.Dense(4 * self.cfg.d_model, name="ff_in")
             self.ff_out = nn.Dense(self.cfg.d_model, name="ff_out")
 
-    def __call__(self, x: Array, train: bool = False, ctx_ids: Array | None = None, mem_temp=None) -> Array | tuple[Array, Array]:
+    def __call__(self, x: Array, train: bool = False, ctx_ids: Array | None = None,
+                 mem_temp=None) -> Array | tuple[Array, Array]:
+        # resolve None on the host side: PKM must never see a None it
+        # branches on under trace (traced arrays break `is None` checks)
+        if mem_temp is None:
+            mem_temp = self.mem_cfg.score_temp
         mask = nn.attention.make_causal_mask(jnp.ones((x.shape[1],), dtype=jnp.bool_))
         x = x + self.attn(self.ln1(x), mask=mask)
         h = self.ln2(x)
@@ -79,8 +84,8 @@ class Navi(nn.Module):
         self.head = nn.Dense(self.cfg.vocab_size, use_bias=False, name="head")
 
     def __call__(self, ids: Array, train: bool = False, mem_temp=None) -> Array | tuple[Array, dict[str, Array]]:
-        x = self.embed(ids) * jnp.sqrt(float(self.cfg.d_model))
-        x = x + _sin_pe(x.shape[1], self.cfg.d_model)
+        if mem_temp is None:
+            mem_temp = self.mem_cfg.score_temp
         aux: dict[str, Array] = {}
         for i, block in enumerate(self.blocks):
             if self.return_aux and block.use_memory:

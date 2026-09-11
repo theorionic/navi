@@ -68,7 +68,7 @@ def cmd_test():
     model_aux = Navi(ModelConfig(), MemoryConfig(), return_aux=True)
     ids = jnp.zeros((2, 16), dtype=jnp.int32)
     params = model.init({"params": jax.random.PRNGKey(0)}, ids, train=False)
-    logits, aux = model_aux.apply(params, ids, train=False)
+    logits, aux, lb = model_aux.apply(params, ids, train=False)
     if logits.shape != (2, 16, ModelConfig().vocab_size):
         print("FAIL bad logits shape", logits.shape)
         failures += 1
@@ -78,6 +78,11 @@ def cmd_test():
         failures += 1
     else:
         print("ok  forward pass, aux from %d memory layers" % n_mem)
+    if float(lb) != 0.0:
+        print("FAIL lb: expected 0.0 aux with lb_weight=0, got", float(lb))
+        failures += 1
+    else:
+        print("ok  lb aux zero by default")
 
     # gradient reaches Pool values
     ids64 = jnp.zeros((4, 64), dtype=jnp.int32)

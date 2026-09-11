@@ -55,7 +55,7 @@ class Block(nn.Module):
             out = out.reshape(x.shape)
             if self.return_aux:
                 slots = m["slots"].reshape(x.shape[0], x.shape[1], -1)
-                return x + out, slots
+                return x + out, (slots, m["lb"])
             return x + out
         return x + self.ff_out(nn.relu(self.ff(h)))
 
@@ -89,14 +89,16 @@ class Navi(nn.Module):
         x = self.embed(ids) * jnp.sqrt(float(self.cfg.d_model))
         x = x + _sin_pe(ids.shape[1], self.cfg.d_model)
         aux: dict[str, Array] = {}
+        lb_total = jnp.float32(0.0)
         for i, block in enumerate(self.blocks):
             if self.return_aux and block.use_memory:
-                x, slots = block(x, train, ctx_ids=ids, mem_temp=mem_temp)
+                x, (slots, lb) = block(x, train, ctx_ids=ids, mem_temp=mem_temp)
                 aux[f"mem_{i}"] = slots
+                lb_total = lb_total + lb
             else:
                 x = block(x, train, ctx_ids=ids, mem_temp=mem_temp)
         logits = self.head(self.ln_f(x))
-        return (logits, aux) if self.return_aux else logits
+        return (logits, aux, lb_total) if self.return_aux else logits
 
 
 def _sin_pe(t: int, d: int) -> Array:

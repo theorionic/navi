@@ -87,7 +87,7 @@ tbatches = windows(TRAFFIC_BATCHES)
 
 @jax.jit
 def ev_aux(pp, ids):
-    _, aux = model_ra.apply(pp, ids, train=False)
+    _, aux, _lb = model_ra.apply(pp, ids, train=False)
     return aux
 
 

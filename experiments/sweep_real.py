@@ -198,7 +198,7 @@ def slot_stats(model_cfg, mem_cfg, params, val_split):
     model = Navi(model_cfg, mem_cfg, return_aux=True)
     @jax.jit
     def slots_of(p, ids):
-        _, aux = model.apply(p, ids, train=False)
+        _, aux, _lb = model.apply(p, ids, train=False)
         return aux
     per_layer = {}
     aux_first = None

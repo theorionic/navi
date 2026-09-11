@@ -39,6 +39,13 @@ class MemoryConfig:
     # Deterministic first-touch gradients: no key sharpening needed at scale.
     hash_slots: bool = False
     hash_k: int = 4  # hash-derived slots gathered per position per class
+    # Router-balance aux: lb_weight * mean negative entropy of the
+    # side-score softmaxes (s1/s2). Spreads candidate mass off hot
+    # subkeys; gradients reach all side keys. Scale O(1).
+    lb_weight: float = 0.0
+    # Split the read: w = softmax(temp * scores) * (1 - lb_eps) + lb_eps/n
+    # -- floor on unselected-slot value mass; 0 = off.
+    lb_eps: float = 0.0
 
 @struct.dataclass
 class TrainConfig:

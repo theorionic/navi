@@ -162,7 +162,7 @@ def main():
 
     @jax.jit
     def ev_aux(pp, ids):
-        _, aux = model_ra.apply(pp, ids, train=False)
+        _, aux, _lb = model_ra.apply(pp, ids, train=False)
         return aux
 
     n_slots_cls = 512 * 512

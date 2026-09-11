@@ -44,6 +44,7 @@ CAND_K = int(os.environ.get("NAVI_CAND_K", "8"))
 TEMP_START = float(os.environ.get("NAVI_TEMP_START", "4.0"))
 TEMP_END = float(os.environ.get("NAVI_TEMP_END", "4.0"))
 TEMP_WARMUP = int(os.environ.get("NAVI_TEMP_WARMUP", "3000"))
+LB_WEIGHT = float(os.environ.get("NAVI_LB", "0.0"))
 CKPT = os.path.expanduser("~/experiments/ckpt_500m.pkl")
 
 mesh = jax.sharding.Mesh(jax.local_devices(), ("cores",))
@@ -104,10 +105,11 @@ def loss_fn(model, p, ids, tg, temp=None):
     # mem_temp must be POSITIONAL: flax 0.12 mis-traces dynamic kwargs
     # under grad ("NoneType is not iterable")
     if temp is None:
-        logits = model.apply(p, ids, train=True)
+        logits, _aux, lb = model.apply(p, ids, True)
     else:
-        logits = model.apply(p, ids, True, temp)
-    return optax.softmax_cross_entropy_with_integer_labels(logits, tg).mean()
+        logits, _aux, lb = model.apply(p, ids, True, temp)
+    ce = optax.softmax_cross_entropy_with_integer_labels(logits, tg).mean()
+    return ce + LB_WEIGHT * lb
 
 
 def is_mem(kp):
@@ -200,7 +202,8 @@ def main():
     print(f"== 500m: BS={BS} SEQ={SEQ} STEPS={STEPS} gen@{GEN_EVERY} "
           f"cores={jax.device_count()} ==", flush=True)
     mem_cfg = MemoryConfig(c1=512, c2=512, cand_k=CAND_K, side_top=64, n_classes=4,
-                           score_temp=TEMP_END)
+                           score_temp=TEMP_END, lb_weight=LB_WEIGHT)
+    print(f"[{TAG}] lb_weight {LB_WEIGHT}", flush=True)
     cfg_m = ModelConfig(d_model=512, n_layers=8, n_heads=8, memory_every=2,
                         vocab_size=260)
     model = Navi(cfg_m, mem_cfg)

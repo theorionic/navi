@@ -82,9 +82,26 @@ class ProductKeyMemory(nn.Module):
         v = self.values[jnp.arange(c.n_classes)[None, None, :, None], slots]
         t = c.score_temp if temp is None else temp
         w = jax.nn.softmax(t * scores, axis=-1)
+        if c.lb_eps > 0.0:
+            w = w * (1.0 - c.lb_eps) + c.lb_eps / w.shape[-1]
         h = (w[..., None] * v).sum(axis=-2)
         h = h.reshape(b, l, c.n_classes * self.per_class_dim)
-        return self.w_o(h), {"slots": slots.reshape(b, l, -1), "scores": scores.reshape(b, l, -1)}
+        lb = jnp.float32(0.0)
+        if c.lb_weight > 0.0:
+            # Balance via ROUTER ENTROPY over the side-score tables.
+            # The switch n_slots * sum(f_i * p_i) form is vacuous for
+            # sparse top-k (f_i over the gathered subset is always 1/k,
+            # so the term can't tell balanced from collapsed). Instead:
+            # maximize entropy of softmax(s1/s2) per class -- gradients
+            # flow through ALL side keys, spreading candidate mass off
+            # the hot subkeys. Loss = mean negative entropy, O(1) scale.
+            p1 = jax.nn.softmax(s1, axis=-1)  # (b, l, classes, c1)
+            p2 = jax.nn.softmax(s2, axis=-1)
+            e1 = -(p1 * jnp.log(p1 + 1e-9)).sum(axis=-1).mean()
+            e2 = -(p2 * jnp.log(p2 + 1e-9)).sum(axis=-1).mean()
+            lb = -(e1 + e2)
+        return self.w_o(h), {"slots": slots.reshape(b, l, -1),
+                             "scores": scores.reshape(b, l, -1), "lb": lb}
 
     def _hash_path(self, x, ctx_ids):
         """Deterministic placement: slot = mix(token ids) mod (c1*c2).
@@ -112,9 +129,8 @@ class ProductKeyMemory(nn.Module):
         slots = slots % n_slots
         v = self.values[cls[:, None, None], slots]  # (C, b, l, D)
         hsum = v.sum(axis=0)  # (b, l, D) uniform combine — w_o learns the readout
-        out = self.w_o(hsum).reshape(b, l, -1)
         aux = {"slots": jnp.transpose(slots, (1, 2, 0)).reshape(b, l, -1),
-               "scores": jnp.ones((b, l, c.n_classes))}
+               "scores": jnp.ones((b, l, c.n_classes)), "lb": jnp.float32(0.0)}
         return out, aux
 
     def num_slots(self) -> int:

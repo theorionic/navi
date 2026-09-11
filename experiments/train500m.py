@@ -15,7 +15,7 @@ Env: NAVI_STEPS (default 20000), NAVI_GEN_EVERY (1000), NAVI_BS (256),
 NAVI_SEQ (512), NAVI_RESUME=1 to resume from ckpt_500m.pkl.
 """
 import sys
-sys.path.insert(0, "/kaggle/working")
+sys.path.insert(0, "/kaggle/working/code")
 from functools import partial
 import gc
 import os
@@ -58,6 +58,7 @@ def shard_tree(tree):
             return jax.device_put(x, jax.sharding.NamedSharding(
                 mesh, jax.sharding.PartitionSpec(None, "cores")))
         return jax.device_put(x, REPL)
+    return jax.tree_util.tree_map_with_path(place, tree)
 
 
 def reshard_tree(tree):

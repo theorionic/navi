@@ -221,22 +221,33 @@ def main():
           f"val {feed.val.total//1024}KB", flush=True)
     rng = np.random.default_rng(0)
 
-    @jax.jit
-    def step(pp, oo, ids, tg, temp):
-        g = jax.grad(lambda q, a, t: loss_fn(model, q, a, t, temp))(pp, ids, tg)
-        # split grads: mem (values/keys) vs core for separate norm logging
-        gm = jax.tree_util.tree_map_with_path(
-            lambda kp, x: x if is_mem(kp) else jnp.zeros_like(x), g)
-        gc_ = jax.tree_util.tree_map_with_path(
-            lambda kp, x: jnp.zeros_like(x) if is_mem(kp) else x, g)
-        g = jax.tree_util.tree_map_with_path(
-            lambda kp, x: x * 10.0 if is_mem(kp) else x, g)
-        u, oo2 = tx.update(g, oo, pp)
-        nrm = (jnp.sqrt(jax.tree_util.tree_reduce(
-            lambda a, x: a + jnp.sum(x * x), gc_, jnp.float32(0.0))),
-               jnp.sqrt(jax.tree_util.tree_reduce(
-            lambda a, x: a + jnp.sum(x * x), gm, jnp.float32(0.0))))
-        return optax.apply_updates(pp, u), oo2, nrm
+    # Bucketed-constexpr temperature: temp is a closed Python float,
+    # so each distinct bucket triggers one retrace (~7 total). This
+    # sidesteps flax 0.12's dynamic-kwarg-under-grad breakage.
+    def make_step(temp):
+        @jax.jit
+        def step(pp, oo, ids, tg):
+            g = jax.grad(lambda q, a, t: loss_fn(model, q, a, t, temp))(pp, ids, tg)
+            gm = jax.tree_util.tree_map_with_path(
+                lambda kp, x: x if is_mem(kp) else jnp.zeros_like(x), g)
+            gc_ = jax.tree_util.tree_map_with_path(
+                lambda kp, x: jnp.zeros_like(x) if is_mem(kp) else x, g)
+            g = jax.tree_util.tree_map_with_path(
+                lambda kp, x: x * 10.0 if is_mem(kp) else x, g)
+            u, oo2 = tx.update(g, oo, pp)
+            nrm = (jnp.sqrt(jax.tree_util.tree_reduce(
+                lambda a, x: a + jnp.sum(x * x), gc_, jnp.float32(0.0))),
+                   jnp.sqrt(jax.tree_util.tree_reduce(
+                lambda a, x: a + jnp.sum(x * x), gm, jnp.float32(0.0))))
+            return optax.apply_updates(pp, u), oo2, nrm
+        return step
+
+    _steps = {}  # bucket temp -> compiled step
+    def step_for(i):
+        t = round(temp_at(i) * 2) / 2  # 0.5-wide buckets -> ~7 compiles
+        if t not in _steps:
+            print(f"[{TAG}] temp bucket {t} (recompile)", flush=True)
+        return _steps[t]
 
     # checkpoints live in /kaggle/working (persists on notebook commit);
     # keep only the latest NAVI_KEEP_CKPT (default 3) to bound disk use
@@ -261,12 +272,11 @@ def main():
     val_hist = []  # (step, val_bpc) - tracked at every gen point
     vb = feed.val.array()
     print(f"[{TAG}] val buffer {len(vb)/1024/1024:.1f}MB held out", flush=True)
-    gn_hist = []  # (step, core_gnorm, mem_gnorm)
     for i in range(start, STEPS):
         win = feed.batch(rng, BS, SEQ)
         ids = jax.device_put(win[:, :-1], BATCH)
         tg = jax.device_put(win[:, 1:], BATCH)
-        p, o, (gn_core, gn_mem) = step(p, o, ids, tg, temp_at(i))
+        p, o, (gn_core, gn_mem) = step_for(i)(p, o, ids, tg)
         if i % 50 == 0 or i == STEPS - 1:
             l = float(loss_fn(model, p, ids, tg, temp_at(i)))
             losses.append(l)

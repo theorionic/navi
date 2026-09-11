@@ -247,6 +247,7 @@ def main():
         t = round(temp_at(i) * 2) / 2  # 0.5-wide buckets -> ~7 compiles
         if t not in _steps:
             print(f"[{TAG}] temp bucket {t} (recompile)", flush=True)
+            _steps[t] = make_step(t)
         return _steps[t]
 
     # checkpoints live in /kaggle/working (persists on notebook commit);

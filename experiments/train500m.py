@@ -196,6 +196,8 @@ def main():
           f"cores={jax.device_count()} ==", flush=True)
     mem_cfg = MemoryConfig(c1=512, c2=512, cand_k=CAND_K, side_top=64, n_classes=4,
                            score_temp=TEMP_END)
+    cfg_m = ModelConfig(d_model=512, n_layers=8, n_heads=8, memory_every=2,
+                        vocab_size=260)
     model = Navi(cfg_m, mem_cfg)
     p0 = init_params(model, SEQ, jax.random.PRNGKey(0))
     flat = jax.tree_util.tree_flatten_with_path(p0)[0]

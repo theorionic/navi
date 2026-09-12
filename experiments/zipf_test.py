@@ -158,8 +158,8 @@ def sample_batch(rng_seed, batch, seq_len):
     seqs = np.full((batch, n_triples * 4), 2, dtype=np.int32)
     for i in range(n_triples):
         seqs[:, 4 * i + 0] = keys + KEY0
-        seqs[:, 4 * i + 1] = n1 + NONCE0
-        seqs[:, 4 * i + 2] = n2 + NONCE0
+        seqs[:, 4 * i + 1] = n1[:, i] + NONCE0
+        seqs[:, 4 * i + 2] = n2[:, i] + NONCE0
         seqs[:, 4 * i + 3] = val[:, i] + VAL0
     return seqs
 

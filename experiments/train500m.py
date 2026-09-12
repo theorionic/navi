@@ -103,13 +103,17 @@ def temp_at(step_i):
 
 def loss_fn(model, p, ids, tg, temp=None):
     # mem_temp must be POSITIONAL: flax 0.12 mis-traces dynamic kwargs
-    # under grad ("NoneType is not iterable")
+    # under grad ("NoneType is not iterable"). model must be the
+    # return_aux view when LB_WEIGHT > 0 (see main()).
     if temp is None:
-        logits, _aux, lb = model.apply(p, ids, True)
+        out = model.apply(p, ids, True)
     else:
-        logits, _aux, lb = model.apply(p, ids, True, temp)
-    ce = optax.softmax_cross_entropy_with_integer_labels(logits, tg).mean()
-    return ce + LB_WEIGHT * lb
+        out = model.apply(p, ids, True, temp)
+    if LB_WEIGHT > 0.0:
+        logits, _aux, lb = out
+        return optax.softmax_cross_entropy_with_integer_labels(
+            logits, tg).mean() + LB_WEIGHT * lb
+    return optax.softmax_cross_entropy_with_integer_labels(out, tg).mean()
 
 
 def is_mem(kp):
@@ -207,6 +211,7 @@ def main():
     cfg_m = ModelConfig(d_model=512, n_layers=8, n_heads=8, memory_every=2,
                         vocab_size=260)
     model = Navi(cfg_m, mem_cfg)
+    model_ra = Navi(cfg_m, mem_cfg, return_aux=True) if LB_WEIGHT > 0.0 else model
     p0 = init_params(model, SEQ, jax.random.PRNGKey(0))
     flat = jax.tree_util.tree_flatten_with_path(p0)[0]
     sz = sum(x.size for _, x in flat)
@@ -231,7 +236,7 @@ def main():
     def make_step(temp):
         @jax.jit
         def step(pp, oo, ids, tg):
-            g = jax.grad(lambda q, a, t: loss_fn(model, q, a, t, temp))(pp, ids, tg)
+            g = jax.grad(lambda q, a, t: loss_fn(model_ra, q, a, t, temp))(pp, ids, tg)
             gm = jax.tree_util.tree_map_with_path(
                 lambda kp, x: x if is_mem(kp) else jnp.zeros_like(x), g)
             gc_ = jax.tree_util.tree_map_with_path(
@@ -284,7 +289,7 @@ def main():
         tg = jax.device_put(win[:, 1:], BATCH)
         p, o, (gn_core, gn_mem) = step_for(i)(p, o, ids, tg)
         if i % 50 == 0 or i == STEPS - 1:
-            l = float(loss_fn(model, p, ids, tg, temp_at(i)))
+            l = float(loss_fn(model_ra, p, ids, tg, temp_at(i)))
             losses.append(l)
             tps = (i - start + 1) * BS * SEQ / max(1e-9, time.time() - t0)
             eta_s = (STEPS - i - 1) * BS * SEQ / max(1e-9, tps)

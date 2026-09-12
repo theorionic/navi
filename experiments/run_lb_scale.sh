@@ -1,6 +1,6 @@
 #!/bin/bash
 # lb scale check: two arms, sequential (TPU v3-8, one process at a time).
-# arm 1: 65k-fact anchor (expect ~100% fresh — validates lb doesn't hurt anchor)
+# arm 1: 65k-fact anchor (expect ~100% fresh - validates lb doesn't hurt anchor)
 # arm 2: 16.8M-fact scale (the VERDICT failure; success = fresh >> 0.4% chance)
 set -e
 cd /kaggle/working/code

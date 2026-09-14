@@ -1,0 +1,6 @@
+[tok] corpus exists (2.50 GB), skip download
+[tok] trained in 57s -> /kaggle/working/tokenizer_16k.json
+[tok] vocab 16384 | bos 0 eos 1 (expect 0/1)
+[tok] sample ids: [13653, 13, 961, 1365, 264, 1795, 5799, 278, 1639, 470, 7251, 15]
+[tok] compression: 3.42 bytes/token
+[tok] OK

@@ -1,0 +1,11 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[bpe] 9.3M train tokens, 0.1M val tokens in 16s
+[bpe] window BOS fraction 0.0013 (doc-boundary only)
+[bpe] decoded head: ' against Oklahoma (35 NET, 33 KenPom) next Wednesday.\nFollowing a meeting against the Razorbacks, West Virgini'
+[bpe] roundtrip stable: 511 -> 511 tokens
+[bpe] OK
+'[Errno 9] Bad file descriptor' thrown while requesting GET https://huggingface.co/datasets/HuggingFaceFW/fineweb/resolve/9bb295ddab0e05d785b879661af7260fed5140fc/sample/10BT/000_00000.parquet
+Retrying in 1s [Retry 1/5].
+Fatal Python error: PyGILState_Release: auto-releasing thread-state, but no thread-state for this thread
+Python runtime state: finalizing (tstate=0x00007b7049081390)
+

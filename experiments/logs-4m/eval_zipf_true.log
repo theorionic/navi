@@ -1,0 +1,16 @@
+/usr/local/lib/python3.12/site-packages/jax/_src/cloud_tpu_init.py:90: UserWarning: Transparent hugepages are not enabled. TPU runtime startup and shutdown time should be significantly improved on TPU v5e and newer. If not already set, you may need to enable transparent hugepages in your VM image (sudo sh -c "echo always > /sys/kernel/mm/transparent_hugepage/enabled")
+  warnings.warn(
+WARNING: Logging before InitGoogle() is written to STDERR
+E0000 00:00:1789369078.197115   20158 common_lib.cc:947] Could not set metric server port: INVALID_ARGUMENT: Could not find SliceBuilder port 8471 in any of the 0 ports provided in `tpu_process_addresses`="local"
+=== Source Location Trace: ===
+learning/45eac/tfrc/runtime/common_lib.cc:239
+[zipf-true] replaying true training exposures...
+[zipf-true] distinct facts seen: 611,086 / 16,777,216
+[zipf-true] accuracy by TRUE exposure (chance 0.0039):
+  exp   0-   1: 0.0109 (draws=16)
+  exp   1-   2: 0.0591 (draws=16)
+  exp   2-   4: 0.1739 (draws=16)
+  exp   4-  16: 0.7569 (draws=16)
+  exp  16-  64: 0.9980 (draws=16)
+  exp  64- inf: 1.0000 (draws=16)
+[zipf-true] DONE in 340s

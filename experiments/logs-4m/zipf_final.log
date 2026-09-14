@@ -1,0 +1,34 @@
+/usr/local/lib/python3.12/site-packages/jax/_src/cloud_tpu_init.py:90: UserWarning: Transparent hugepages are not enabled. TPU runtime startup and shutdown time should be significantly improved on TPU v5e and newer. If not already set, you may need to enable transparent hugepages in your VM image (sudo sh -c "echo always > /sys/kernel/mm/transparent_hugepage/enabled")
+  warnings.warn(
+WARNING: Logging before InitGoogle() is written to STDERR
+E0000 00:00:1789367376.972929    6345 common_lib.cc:947] Could not set metric server port: INVALID_ARGUMENT: Could not find SliceBuilder port 8471 in any of the 0 ports provided in `tpu_process_addresses`="local"
+=== Source Location Trace: ===
+learning/45eac/tfrc/runtime/common_lib.cc:239
+[zipf] zipf a=1.5: pair count pct50=0 pct90=0 pct99=6 max=293281
+[zipf] == zipf exposure test: a=1.5 steps=4000 bs=512 cores=8 ==
+[zipf] params total 275,143,680
+[zipf] step     0 loss 7.2154 (17.915s/it)
+[zipf] step   250 loss 1.4287 (0.265s/it)
+[zipf] step   500 loss 1.4010 (0.230s/it)
+[zipf] step   750 loss 1.3300 (0.218s/it)
+[zipf] step  1000 loss 1.3395 (0.213s/it)
+[zipf] step  1250 loss 1.3134 (0.209s/it)
+[zipf] step  1500 loss 1.3115 (0.207s/it)
+[zipf] step  1750 loss 1.2932 (0.205s/it)
+[zipf] step  2000 loss 1.2901 (0.204s/it)
+[zipf] step  2250 loss 1.2861 (0.203s/it)
+[zipf] step  2500 loss 1.2844 (0.202s/it)
+[zipf] step  2750 loss 1.3051 (0.201s/it)
+[zipf] step  3000 loss 1.2878 (0.201s/it)
+[zipf] step  3250 loss 1.2826 (0.200s/it)
+[zipf] step  3500 loss 1.2936 (0.200s/it)
+[zipf] step  3750 loss 1.3061 (0.200s/it)
+[zipf] step  3999 loss 1.3037 (0.199s/it)
+[zipf] EVAL by exposure bucket (chance 0.0039):
+[zipf]   hot  : 0.9926
+[zipf]   mid  : 0.7313
+[zipf]   tail : 0.0000
+[zipf]   cold : 0.8190
+[zipf]   zero  hot 0.0000 cold 0.0004
+[zipf]   shuff hot 0.0000 cold 0.0004
+[zipf] == DONE in 1349s ==

@@ -1,0 +1,35 @@
+/usr/local/lib/python3.12/site-packages/jax/_src/cloud_tpu_init.py:90: UserWarning: Transparent hugepages are not enabled. TPU runtime startup and shutdown time should be significantly improved on TPU v5e and newer. If not already set, you may need to enable transparent hugepages in your VM image (sudo sh -c "echo always > /sys/kernel/mm/transparent_hugepage/enabled")
+  warnings.warn(
+WARNING: Logging before InitGoogle() is written to STDERR
+E0000 00:00:1789365573.839446    2858 common_lib.cc:947] Could not set metric server port: INVALID_ARGUMENT: Could not find SliceBuilder port 8471 in any of the 0 ports provided in `tpu_process_addresses`="local"
+=== Source Location Trace: ===
+learning/45eac/tfrc/runtime/common_lib.cc:239
+[stage-lb] == staged expansion with rehearsal, LB=0.01 cores=8 ==
+[stage-lb] s1 step     0/1500 (13.620s/it)
+[stage-lb] s1 step   250/1500 (0.229s/it)
+[stage-lb] s1 step   500/1500 (0.212s/it)
+[stage-lb] s1 step   750/1500 (0.206s/it)
+[stage-lb] s1 step  1000/1500 (0.203s/it)
+[stage-lb] s1 step  1250/1500 (0.201s/it)
+[stage-lb] s1 step  1499/1500 (0.200s/it)
+[stage-lb] stage 1 (nonce=64) EVAL fresh 1.0000
+[stage-lb] stage 1 ckpt saved
+[stage-lb] stage 2: warm-start 102 carried, 2 re-inited
+[stage-lb] s2 step     0/1500 (13.735s/it)
+[stage-lb] s2 step   250/1500 (0.281s/it)
+[stage-lb] s2 step   500/1500 (0.237s/it)
+[stage-lb] s2 step   750/1500 (0.223s/it)
+[stage-lb] s2 step  1000/1500 (0.216s/it)
+[stage-lb] s2 step  1250/1500 (0.212s/it)
+[stage-lb] s2 step  1499/1500 (0.209s/it)
+[stage-lb] stage 2 (nonce=256) EVAL fresh 0.0003
+[stage-lb] stage 2 EVAL old-space nonce=64 acc 0.0039
+[stage-lb] stage 2 EVAL zero-fresh 0.0012
+[stage-lb] stage 2 ckpt saved
+[stage-lb] stage 3: warm-start 102 carried, 2 reinited
+[stage-lb] s3 step     0/4000 (13.444s/it)
+[stage-lb] s3 step  250/4000 (0.278s/it)
+[stage-lb] s3 step  500/4000 (0.236s/it)
+[stage-lb] s3 step  750/4000 (0.222s/it)
+[stage-lb] s3 step 1000/4000 (0.215s/it)
+[stage-lb] s3 step 1250/4000 (0.211s/it)

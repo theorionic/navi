@@ -228,7 +228,7 @@ def main():
                 continue
             k_sel = np.broadcast_to(keys[:, None], m.shape)[m]
             n_sel = int(m.sum())
-            pad = (-n_sel) % CORES
+            pad = (-n_sel) % jax.device_count()
             seqs = np.full((n_sel + pad, 4), 2, dtype=np.int32)
             seqs[:n_sel, 0] = k_sel + KEY0
             seqs[:n_sel, 1] = n1[m] + NONCE0

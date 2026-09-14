@@ -1,0 +1,28 @@
+/usr/local/lib/python3.12/site-packages/jax/_src/cloud_tpu_init.py:90: UserWarning: Transparent hugepages are not enabled. TPU runtime startup and shutdown time should be significantly improved on TPU v5e and newer. If not already set, you may need to enable transparent hugepages in your VM image (sudo sh -c "echo always > /sys/kernel/mm/transparent_hugepage/enabled")
+  warnings.warn(
+WARNING: Logging before InitGoogle() is written to STDERR
+E0000 00:00:1789372788.857161   47363 common_lib.cc:947] Could not set metric server port: INVALID_ARGUMENT: Could not find SliceBuilder port 8471 in any of the 0 ports provided in `tpu_process_addresses`="local"
+=== Source Location Trace: ===
+learning/45eac/tfrc/runtime/common_lib.cc:239
+[prof] full fwd+bwd bs=256: 2093.4 ms
+[prof] full fwd+bwd bs=128: 1056.4 ms
+[prof] full fwd+bwd bs=64: 554.6 ms
+[prof] hlo top: []
+[prof] abl B no-pool: 58.6 ms
+[prof] abl C no-lb: 2076.6 ms
+[prof] abl D values-frozen: 2107.1 ms
+Traceback (most recent call last):
+  File "/kaggle/working/code/profiling/profile_pool.py", line 173, in <module>
+    t = timeit(lambda: pkm_step(pk, x32))
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/kaggle/working/code/profiling/profile_pool.py", line 61, in timeit
+    fn()
+  File "/kaggle/working/code/profiling/profile_pool.py", line 173, in <lambda>
+    t = timeit(lambda: pkm_step(pk, x32))
+                       ^^^^^^^^^^^^^^^^^
+  File "/kaggle/working/code/profiling/profile_pool.py", line 170, in pkm_step
+    return jax.grad(l)(q, x)
+           ^^^^^^^^^^^^^^^^^
+TypeError: pkm_step.<locals>.l() takes 1 positional argument but 2 were given
+--------------------
+For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.

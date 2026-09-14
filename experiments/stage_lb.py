@@ -235,10 +235,10 @@ def main():
             return optax.apply_updates(pp, u), oo2
 
         @jax.jit
-        def acc(pp, b):
-            lg = model.apply(pp, b[:, :-1], train=False)
+        def acc(pp, ids, tg):
+            lg = model.apply(pp, ids, train=False)
             pv = lg[:, 2::4].argmax(-1)
-            tv = b[:, 3::4]
+            tv = tg[:, 2::4]
             return (pv == tv).mean()
 
         def ev(pp, nn_ev, seed_base):

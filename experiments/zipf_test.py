@@ -226,11 +226,13 @@ def main():
                 m = c == 0
             if m.sum() < 8:
                 continue
-            seqs = np.full((int(m.sum()), SEQ), 2, dtype=np.int32)
-            seqs[:, 0::4] = keys[m][:, None] + KEY0
-            seqs[:, 1::4] = n1[m][:, None] + NONCE0
-            seqs[:, 2::4] = n2[m][:, None] + NONCE0
-            seqs[:, 3::4] = val[m][:, None] + VAL0
+            k_sel = np.broadcast_to(keys[:, None], m.shape)[m]
+            n_sel = int(m.sum())
+            seqs = np.full((n_sel, 4), 2, dtype=np.int32)
+            seqs[:, 0] = k_sel + KEY0
+            seqs[:, 1] = n1[m] + NONCE0
+            seqs[:, 2] = n2[m] + NONCE0
+            seqs[:, 3] = val[m] + VAL0
             lg = model.apply(pp, jax.device_put(seqs[:, :-1], BATCH), train=False)
             a = fact_acc(lg, jax.device_put(seqs[:, 1:], BATCH))
             accs.append(float(a))

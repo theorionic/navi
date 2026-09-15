@@ -1,6 +1,7 @@
 """Final eval for bpe500m run22f: GEN samples, tight COV, slot traffic.
 Run on the TPU kernel after training completes. Read-only on the ckpt."""
 import gc, os, pickle, sys, time
+from functools import partial
 sys.path.insert(0, "/kaggle/working/code")
 sys.path.insert(0, "/kaggle/working/code/tok")
 import numpy as np

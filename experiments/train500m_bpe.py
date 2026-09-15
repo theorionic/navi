@@ -96,9 +96,25 @@ def is_mem(kp):
     return "values" in ks or "/k1" in ks or "/k2" in ks
 
 
-def make_tx(params):
-    core = optax.lion(learning_rate=3e-4, b1=0.9, b2=0.99, weight_decay=0.03)
-    mem = optax.lion(learning_rate=3e-4, b1=0.9, b2=0.99, weight_decay=0.0)
+LR = float(os.environ.get("NAVI_LR", "3e-4"))
+WARMUP = int(os.environ.get("NAVI_WARMUP", "1000"))
+
+
+def make_tx(params, total_steps):
+    """Per-group LR policy (memory-layer structure):
+    - backbone + pool keys/router: warmup -> cosine decay to ~5% of peak.
+      Late-training key drift re-routes every read; decay locks routing in.
+    - pool values: CONSTANT. Sparse top-k touches mean each slot sees ~80
+      updates in 20k steps; decaying their LR freezes cold slots at stale
+      values. Kept plastic to the end by design.
+    """
+    sched_core = optax.warmup_cosine_decay_schedule(
+        init_value=LR * 0.05, peak_value=LR,
+        warmup_steps=WARMUP, decay_steps=max(1, total_steps - WARMUP),
+        end_value=LR * 0.05)
+    core = optax.lion(learning_rate=sched_core, b1=0.9, b2=0.99,
+                      weight_decay=0.03)
+    mem = optax.lion(learning_rate=LR, b1=0.9, b2=0.99, weight_decay=0.0)
     labels = jax.tree_util.tree_map_with_path(
         lambda kp, _: "mem" if is_mem(kp) else "core", params)
     return optax.multi_transform({"core": core, "mem": mem}, labels)
@@ -171,6 +187,34 @@ def val_loss(model, params, val_tokens, n_batches=8):
     return float(np.mean(ces)) / np.log(2)
 
 
+def pool_coverage(model_ra, params, val_tokens, n_batches=2):
+    """Distinct-slot coverage per memory block over fresh val windows.
+
+    Counts distinct (class, slot) reads the router actually selects, per
+    memory block, as a fraction of the block's c1*c2*n_classes slot space.
+    aux['mem_L'] is (b, l, classes*cand_k), CLASS-MAJOR (pkm.py packs
+    slots.reshape(b, l, -1) from (b, l, classes, cand_k)).
+    """
+    n_slots = 512 * 512 * 4  # c1*c2*n_classes, fixed by this run's config
+    rng = np.random.default_rng(11)
+    hi = len(val_tokens) - SEQ - 2
+    per_block = {}
+    for _ in range(n_batches):
+        offs = rng.integers(0, hi, size=16)
+        idx = offs[:, None] + np.arange(SEQ + 1)[None, :]
+        win = val_tokens[idx]
+        ids = jax.device_put(win[:, :-1])
+        _, aux, _ = model_ra.apply(params, ids, train=False)
+        for name, s in aux.items():
+            arr = np.asarray(s)                     # (b, l, classes*cand_k)
+            sets = per_block.setdefault(name, set())
+            for cls in range(arr.shape[-1] // CAND_K):
+                sl = arr[..., cls * CAND_K:(cls + 1) * CAND_K].reshape(-1)
+                sets.update((cls, int(v)) for v in sl)
+    names = sorted(per_block)
+    return [len(per_block[n]) / n_slots for n in names]
+
+
 def do_generation(model, params, tok, step_i):
     print(f"[{TAG}] ---- GENERATION @ step {step_i} ----", flush=True)
     texts = generate(model, params, tok, PROMPTS, GEN_LEN, temp=0.8,
@@ -187,14 +231,12 @@ def main():
     cfg_m = ModelConfig(d_model=512, n_layers=8, n_heads=8, memory_every=2,
                         vocab_size=VOCAB)
     model = Navi(cfg_m, mem_cfg)
+    model_ra = Navi(cfg_m, mem_cfg, return_aux=True)  # coverage eval only
     p0 = init_params(model, SEQ, jax.random.PRNGKey(0))
-    flat = jax.tree_util.tree_flatten_with_path(p0)[0]
-    sz = sum(x.size for _, x in flat)
-    msz = sum(x.size for k, x in flat if "mem" in jax.tree_util.keystr(k))
     print(f"[{TAG}] params {sz:,} (mem {msz:,})", flush=True)
 
     p = shard_tree(p0)
-    tx = make_tx(p0)
+    tx = make_tx(p0, STEPS)
     o = shard_tree(tx.init(p0))
     del p0, flat
     gc.collect()
@@ -250,7 +292,7 @@ def main():
     step = make_step(temp_at(0))
 
     keep = int(os.environ.get("NAVI_KEEP_CKPT", "2"))
-    losses, gn_hist, val_hist = [], [], []
+    losses, gn_hist, val_hist, cov_hist = [], [], [], []
     t0 = time.time()
     for i in range(start, STEPS):
         win = feed.batch(rng, BS, SEQ)
@@ -273,14 +315,16 @@ def main():
             v = val_loss(model, p, val)
             val_hist.append((i, v))
             print(f"[{TAG}] VAL@{i} bpc {v:.4f} (held-out)", flush=True)
-            if GEN_ON:
-                do_generation(model, p, tok, i)
-        if i % 500 == 499 or i == STEPS - 1:
+            cov = pool_coverage(model_ra, p, val)
+            cov_hist.append((i, cov))
+            print(f"[{TAG}] COV@{i} " +
+                  " ".join(f"b{bi}={c*100:.1f}%" for bi, c in enumerate(cov)),
+                  flush=True)
             ck = os.path.join(CKPT_DIR, f"{CKPT_PREFIX}{i:06d}.pkl")
             with open(ck + ".tmp", "wb") as f:
                 pickle.dump({"params": p, "opt": o, "step": i,
                              "losses": losses, "val_hist": val_hist,
-                             "gn_hist": gn_hist}, f)
+                             "gn_hist": gn_hist, "cov_hist": cov_hist}, f)
             os.replace(ck + ".tmp", ck)
             old = sorted(f for f in os.listdir(CKPT_DIR)
                          if f.startswith(CKPT_PREFIX) and f.endswith(".pkl"))

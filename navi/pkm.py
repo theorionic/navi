@@ -41,10 +41,15 @@ class ProductKeyMemory(nn.Module):
         self.k2 = self.param(
             "k2", jax.nn.initializers.normal(0.02), (c.n_classes, c.c2, self.per_class_dim)
         )
-        # the Pool: values[class, slot, dim] -- the offload tier at scale
+        # the Pool: values[class, slot, dim] -- the offload tier at scale.
+        # bf16 storage: half the HBM for params + Lion state + grads (the
+        # 8-block run23 config needs it: fp32 x3 = 12.9GB > 9.5GB/core).
+        # Values are a lookup table accumulated over tens of thousands of
+        # touches - bf16 (8 mantissa bits) is quantization-insensitive here.
+        # Cast to fp32 after the gather; softmax/weighting stay fp32.
         self.values = self.param(
             "values",
-            jax.nn.initializers.normal(0.02),
+            jax.nn.initializers.normal(0.02, dtype=jnp.bfloat16),
             (c.n_classes, c.c1 * c.c2, self.per_class_dim),
         )
 
@@ -114,6 +119,7 @@ class ProductKeyMemory(nn.Module):
         pi2 = jnp.take_along_axis(pi2, col, axis=-1)
         slots = pi1 * c.c2 + pi2
         v = self.values[jnp.arange(c.n_classes)[None, None, :, None], slots]
+        v = v.astype(jnp.float32)  # bf16 storage; math in fp32
         t = c.score_temp if temp is None else temp
         w = jax.nn.softmax(t * scores, axis=-1)
         if c.lb_eps > 0.0:

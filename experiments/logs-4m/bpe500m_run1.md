@@ -29,7 +29,7 @@ Second kernel loss of the day; first was ~13:41 (run18/19 era).
    the hang somehow recurs, fall back to NAVI_GEN=0 + offline generation.
 
 ## Local files (authoritative, checksummed)
-- experiments/train500m_bpe.py  6f5d0388  (val-batch fix in, gen re-enabled via NAVI_GEN=1 default path)
+- experiments/train500m_bpe.py  3b47a0a5  (scan-gen + val-batch fix, commit 36b5403)
 - experiments/grain_parquet_data.py  486def05
 - experiments/tokenizer_16k.json  (16k BPE, kernel-verified)
 

@@ -104,47 +104,55 @@ def make_tx(params):
     return optax.multi_transform({"core": core, "mem": mem}, labels)
 
 
-@partial(jax.jit, static_argnames=["model"])
-def generate_step(model, params, ids, pos):
-    logits = model.apply(params, ids, train=False)
-    return logits[:, pos, :]
-
-
-def generate(model, params, tok, prompt: str, n_tokens: int, temp=0.8, rng=None):
-    if rng is None:
-        rng = jax.random.PRNGKey(0)
-    ids = [BOS] + tok.encode(prompt, add_special_tokens=False).ids
-    out = []
-    buf = np.zeros((1, SEQ), dtype=np.int32)
-    for _ in range(n_tokens):
-        buf.fill(0)
-        if len(ids) <= SEQ:
-            buf[0, :len(ids)] = ids
-            pos = len(ids) - 1
-        else:
-            buf[0, :] = ids[-SEQ:]
-            pos = SEQ - 1
-        logits = generate_step(model, params, jnp.asarray(buf), jnp.int32(pos))
-        logits = logits.at[0, EOS].set(-1e9)
-        rng, subkey = jax.random.split(rng)
-        if temp <= 0:
-            nxt = int(jnp.argmax(logits[0]))
-        else:
-            nxt = int(jax.random.categorical(subkey, logits / temp)[0])
-        out.append(nxt)
-        ids.append(nxt)
-    return tok.decode(out)
-
+# ---- generation: fully jitted lax.scan decode, batched over prompts ----
+# The old per-token eager loop (model-apply + logits.set + categorical +
+# int() host sync, ~2.5k dispatch/sync round-trips per burst) livelocked the
+# TPU driver: one driver thread pinned at 100% CPU, a device->host transfer
+# that never completed. The scan compiles ONCE and runs the whole decode
+# on-device; the only host sync is the final device_get of all samples.
 
 PROMPTS = ["The", "Once upon a time", "In 2026, the president of", "Water is"]
 
+@partial(jax.jit, static_argnames=("model", "n_steps"))
+def _gen_scan(model, params, ids, pos0, n_steps, temp, seed=0):
+    """ids: (G, SEQ) int32, prompts right-packed from column 0 (PAD=0 beyond).
+    pos0: scalar, index of the last prompt token. Returns (n_steps, G) ids."""
+    G = ids.shape[0]
+    rows = jnp.arange(G)
 
-def do_generation(model, params, tok, step_i):
-    print(f"[{TAG}] ---- GENERATION @ step {step_i} ----", flush=True)
-    rng = jax.random.PRNGKey(step_i + 42)
-    for pr in PROMPTS:
-        rng, subkey = jax.random.split(rng)
-        txt = generate(model, params, tok, pr, GEN_LEN, rng=subkey)
+    def body(carry, _):
+        ids, pos, rng = carry
+        logits = model.apply(params, ids, train=False)
+        lg = logits[rows, pos]
+        lg = lg.at[..., EOS].set(-1e9)
+        rng, sk = jax.random.split(rng)
+        nxt = jax.random.categorical(sk, lg / jnp.maximum(temp, 1e-6))
+        ids = ids.at[rows, jnp.minimum(pos + 1, SEQ - 1)].set(nxt)
+        return (ids, jnp.minimum(pos + 1, SEQ - 1), rng), nxt
+
+    rng = jax.random.PRNGKey(seed)
+    (ids, pos, rng), out = jax.lax.scan(body, (ids, pos0, rng), None,
+                                        length=n_steps)
+    return out
+
+
+def generate(model, params, tok, prompts, n_tokens, temp=0.8, seed=0):
+    """Right-packed prompts, read at pos, write sample at pos+1 - identical
+    semantics to the old eager loop, minus the 2.5k host round-trips."""
+    G = len(prompts)
+    buf = np.zeros((G, SEQ), dtype=np.int32)
+    pos0 = 0
+    for g, pr in enumerate(prompts):
+        ids = [BOS] + tok.encode(pr, add_special_tokens=False).ids
+        ids = ids[:SEQ - n_tokens]          # keep room for the continuation
+        buf[g, :len(ids)] = ids
+        pos0 = max(pos0, len(ids) - 1)
+    out = _gen_scan(model, params, jnp.asarray(buf), jnp.int32(pos0),
+                    n_tokens, temp, seed)
+    out = jax.device_get(out)               # the ONE device->host sync
+    return [tok.decode([int(t) for t in out[:, g]]) for g in range(G)]
+
+
 def val_loss(model, params, val_tokens, n_batches=8):
     @jax.jit
     def ev(p, ids, tg):
@@ -161,7 +169,15 @@ def val_loss(model, params, val_tokens, n_batches=8):
         ces.append(float(ev(params, jax.device_put(win[:, :-1]),
                             jax.device_put(win[:, 1:]))))
     return float(np.mean(ces)) / np.log(2)
-    return float(np.mean(ces)) / np.log(2)
+
+
+def do_generation(model, params, tok, step_i):
+    print(f"[{TAG}] ---- GENERATION @ step {step_i} ----", flush=True)
+    texts = generate(model, params, tok, PROMPTS, GEN_LEN, temp=0.8,
+                     seed=step_i + 42)
+    for pr, txt in zip(PROMPTS, texts):
+        one = txt.replace("\r", " ").replace("\n", " ")
+        print(f"[{TAG}] GEN [{pr!r}] -> {one[:160]}", flush=True)
 
 def main():
     print(f"== bpe500m: BS={BS} SEQ={SEQ} STEPS={STEPS} gen@{GEN_EVERY} "

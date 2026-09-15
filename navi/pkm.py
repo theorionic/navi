@@ -129,6 +129,7 @@ class ProductKeyMemory(nn.Module):
         slots = slots % n_slots
         v = self.values[cls[:, None, None], slots]  # (C, b, l, D)
         hsum = v.sum(axis=0)  # (b, l, D) uniform combine — w_o learns the readout
+        out = x + self.w_o(hsum)
         aux = {"slots": jnp.transpose(slots, (1, 2, 0)).reshape(b, l, -1),
                "scores": jnp.ones((b, l, c.n_classes)), "lb": jnp.float32(0.0)}
         return out, aux

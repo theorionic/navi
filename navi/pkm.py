@@ -75,27 +75,43 @@ class ProductKeyMemory(nn.Module):
         g1 = jnp.take_along_axis(s1, i1, axis=-1)
         g2 = jnp.take_along_axis(s2, i2, axis=-1)
 
+        # Two-level top-k over the side grid: for any row i, the top-cand_k
+        # entries are g1[i] + top-cand_k(g2) (additive grid => per-row order
+        # is g2's order). The global top-k must therefore lie in the union
+        # of per-row top-(cand_k) sets, i.e. the (side, cand_k) sub-grid.
+        # This is EXACT (proof: if j* not in top-cand_k(g2), then k entries
+        # in the same row i* beat grid[i*, j*], so (i*,j*) can't be global
+        # top-k) and shrinks the transient from (side x side) to
+        # (side x cand_k): side_top=128 -> 1024 pairs, 16x smaller than
+        # 16384, keeping the HBM transient at ~0.27GB per replica instead
+        # of 4.3GB. side_top can now scale to 256+ with no memory cliff.
+        g2k = min(c.cand_k, c.side_top)
+        g2_top = jax.lax.top_k(g2, g2k)[1]          # (b, l, classes, g2k)
+        g2_vals = jnp.take_along_axis(g2, g2_top, axis=-1)
+
         def class_grid(gs):
-            g1c, g2c = gs
-            # (b, l, side) x 2 -> (b, l, side*side) scores + flat pair ids
-            sub = g1c[..., :, None] + g2c[..., None, :]
+            g1c, g2c = gs  # each (b, l, side) / (b, l, g2k) - class stripped
+            # build (side, g2k) grid, top over side*g2k pairs
+            sub = g1c[..., :, None] + g2c[..., None, :]  # (b,l,side,g2k)
             side = sub.shape[-2]
-            flat = sub.reshape(b, l, side * side)
-            k = min(c.cand_k, side * side)
+            flat = sub.reshape(b, l, side * g2k)
+            k = min(c.cand_k, side * g2k)
             f_idx = jax.lax.top_k(flat, k)[1]
             scores = jnp.take_along_axis(flat, f_idx, -1)
             return f_idx, scores
 
-        # map over the class axis: bring classes to the leading axis first
-        # (classes are independent planes, so per-class chunking is exact)
-        g1c, g2c = jnp.moveaxis(g1, 2, 0), jnp.moveaxis(g2, 2, 0)
+        # map over the class axis (classes are independent planes: exact)
+        g1c = jnp.moveaxis(g1, 2, 0)
+        g2c = jnp.moveaxis(g2_vals, 2, 0)
         f_idx, scores = jax.lax.map(class_grid, (g1c, g2c))
+        # (classes, b, l, k) -> (b, l, classes, k)
         f_idx = jnp.moveaxis(f_idx, 0, 2)
         scores = jnp.moveaxis(scores, 0, 2)
         side = c.side_top
-        r, col = f_idx // side, f_idx % side
+        r, col = f_idx // g2k, f_idx % g2k
         pi1 = jnp.take_along_axis(i1, r, axis=-1)
-        pi2 = jnp.take_along_axis(i2, col, axis=-1)
+        pi2 = jnp.take_along_axis(i2, g2_top, axis=-1)
+        pi2 = jnp.take_along_axis(pi2, col, axis=-1)
         slots = pi1 * c.c2 + pi2
         v = self.values[jnp.arange(c.n_classes)[None, None, :, None], slots]
         t = c.score_temp if temp is None else temp

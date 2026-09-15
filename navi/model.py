@@ -67,8 +67,11 @@ class Navi(nn.Module):
 
     def setup(self) -> None:
         self.embed = nn.Embed(self.cfg.vocab_size, self.cfg.d_model, name="embed")
+        # remat per block: 16 materialized causal-attention softmaxes at
+        # BS=256/SEQ=512 cost ~4.3GB HBM for backward (32x512x512 fp32 per
+        # layer); recomputing per block trades ~30% step time for fitting.
         self.blocks = [
-            Block(
+            nn.remat(Block)(
                 cfg=self.cfg,
                 use_memory=(
                     self.cfg.memory_every > 0

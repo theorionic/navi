@@ -233,6 +233,9 @@ def main():
     model = Navi(cfg_m, mem_cfg)
     model_ra = Navi(cfg_m, mem_cfg, return_aux=True)  # coverage eval only
     p0 = init_params(model, SEQ, jax.random.PRNGKey(0))
+    flat = jax.tree_util.tree_flatten_with_path(p0)[0]
+    sz = sum(x.size for _, x in flat)
+    msz = sum(x.size for k, x in flat if "mem" in jax.tree_util.keystr(k))
     print(f"[{TAG}] params {sz:,} (mem {msz:,})", flush=True)
 
     p = shard_tree(p0)

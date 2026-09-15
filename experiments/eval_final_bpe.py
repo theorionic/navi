@@ -2,9 +2,7 @@
 Run on the TPU kernel after training completes. Read-only on the ckpt."""
 import sys
 sys.path.insert(0, "/kaggle/working/code")
-sys.path.insert(0, "/kaggle/working/code/experiments")
-import gc, os, pickle, time
-import jax, jax.numpy as jnp
+sys.path.insert(0, "/kaggle/working/code/tok")
 import numpy as np
 import optax
 from navi.config import MemoryConfig, ModelConfig

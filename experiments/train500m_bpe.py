@@ -314,6 +314,8 @@ def main():
             del p
             gc.collect()
             p, o, start, _ = load_ckpt_sharded(ckpt_path, new_opt_state=fresh_o)
+            del fresh_o   # drop the init-time opt-state copy: HBM is tight
+            gc.collect()
             print(f"[{TAG}] RESUMED from {ckpt_path} at step {start}", flush=True)
 
     def make_step(temp):

@@ -310,7 +310,10 @@ def main():
     # old = st22["params"] is the FULL init-style tree: {'params': {...}}
     old_root = old.get("params", old)
     def graft(kp, new_leaf):
-        parts = [p.strip("'\"") for p in jax.tree_util.keystr(kp).split("/")]
+        # keystr gives "['params']['block_0']['mem']['k1']" (no separators)
+        # - parse the bracketed names
+        import re as _re
+        parts = [m for m in _re.findall(r"\['([^']+)'\]", jax.tree_util.keystr(kp))]
         if parts and parts[0] == "params":
             parts = parts[1:]
         cur = old_root

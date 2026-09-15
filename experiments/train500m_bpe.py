@@ -310,9 +310,10 @@ def main():
                        if f.startswith(CKPT_PREFIX) and f.endswith(".pkl"))
         if ckpts:
             ckpt_path = os.path.join(CKPT_DIR, ckpts[-1])
-            del p, o
+            fresh_o = o
+            del p
             gc.collect()
-            p, o, start, _ = load_ckpt_sharded(ckpt_path, new_opt_state=o)
+            p, o, start, _ = load_ckpt_sharded(ckpt_path, new_opt_state=fresh_o)
             print(f"[{TAG}] RESUMED from {ckpt_path} at step {start}", flush=True)
 
     def make_step(temp):

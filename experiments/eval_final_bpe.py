@@ -3,6 +3,7 @@ Run on the TPU kernel after training completes. Read-only on the ckpt."""
 import gc, os, pickle, sys, time
 from functools import partial
 sys.path.insert(0, "/kaggle/working/code")
+sys.path.insert(0, "/kaggle/working/code/tok")
 import jax
 import jax.numpy as jnp
 import numpy as np

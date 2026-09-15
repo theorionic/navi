@@ -106,7 +106,11 @@ def slot_traffic(model_ra, params, val_tokens, n_batches=4):
         tot = bc.sum()
         top100 = np.sort(bc)[::-1][:100].sum() / tot
         p_ = bc / tot
-        gini = float((np.abs(p_[:, None] - p_[None, :]).sum() / (2 * p_.size * p_.sum())))
+        # O(N log N) Gini via sorted CDF (quadratic form is 1e12 ops on 1M slots)
+        srt = np.sort(bc)
+        cum = np.cumsum(srt)
+        gini = float(1.0 - 2.0 * np.sum(cum - srt / 2.0) / (p_.size * tot)
+                     ) if tot > 0 else 0.0
         alive = int((bc > 0).sum())
         out[name] = (top100, gini, alive)
     return out

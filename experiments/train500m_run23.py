@@ -316,9 +316,12 @@ def main():
         try:
             for name in parts:
                 cur = cur[int(name)] if name.isdigit() else cur[name]
-            return cur
         except (KeyError, IndexError, TypeError):
             return new_leaf
+        # keep the NEW tree's dtype (Pool values are bf16 in run23)
+        if cur.dtype != new_leaf.dtype:
+            return cur.astype(new_leaf.dtype)
+        return cur
     p0 = jax.tree_util.tree_map_with_path(graft, p0)
     old_params = old.get("params", old)
     check = old_params.get("block_0", {}).get("mem", {}).get("k1")

@@ -307,12 +307,13 @@ def main():
     # blocks attn+mem, odd blocks attn+ff, in BOTH configs since
     # memory_every=2 and memory_from_layer=0 in both). New blocks 8-15
     # stay fresh. Non-block params (embed, ln_f, head) transfer too.
-    grafted = {"old": old}
+    # old = st22["params"] is the FULL init-style tree: {'params': {...}}
+    old_root = old.get("params", old)
     def graft(kp, new_leaf):
         parts = [p.strip("'\"") for p in jax.tree_util.keystr(kp).split("/")]
         if parts and parts[0] == "params":
             parts = parts[1:]
-        cur = old
+        cur = old_root
         try:
             for name in parts:
                 cur = cur[int(name)] if name.isdigit() else cur[name]

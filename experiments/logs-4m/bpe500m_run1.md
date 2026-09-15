@@ -14,15 +14,19 @@ Second kernel loss of the day; first was ~13:41 (run18/19 era).
 - VAL evals ran: VAL@0 13.22, VAL@1000 7.07 bpc (held-out).
 - Data resume exact (PhaseFeed cursor skip verified twice).
 
-## The two open bugs (both real, both repro'd)
-1. Generation deadlock (run17, step-0 gen): jitted generate() with
-   jax.random.categorical deadlocks inside TPU driver - one driver thread
-   pins 100% CPU for 20+ min, no I/O, last compiled op jit__argmax. Not
-   diagnosed further; py-spy blocked (no ptrace in container).
-2. val_loss OOM at 16k vocab (dbg3): jit_ev needed 126MB contiguous with
-   119MB free; val batch was 64x512x16384 fp32 logits. FIXED in local file:
-   val batch 64 -> 16 (train500m_bpe.py line 158). Untested - dbg4 was the
-   test of this fix when the kernel died.
+## Bug status after run 1
+1. Generation livelock - FIXED (commit 36b5403). Rewritten as a single
+   jitted lax.scan (_gen_scan in train500m_bpe.py): 4 prompts batched,
+   sampled on-device, per-step seed=step_i+42, EOS masked, ONE device_get
+   per burst. CPU smoke-tested end-to-end incl. the real tokenizer surface.
+   Root cause: the old eager loop did ~2.5k dispatch/sync round-trips per
+   burst -> driver-thread livelock on a never-completing device->host
+   transfer. Not a compile issue (all compiles finished).
+2. val_loss OOM at 16k vocab - FIXED same commit (val batch 64->16).
+3. pkm._hash_path NameError ('out' undefined) - FIXED same commit; found
+   by the smoke test. Hash-path forward regression-tested.
+   Remaining TPU-only risk: scan compile is ~4min extra at first gen; if
+   the hang somehow recurs, fall back to NAVI_GEN=0 + offline generation.
 
 ## Local files (authoritative, checksummed)
 - experiments/train500m_bpe.py  6f5d0388  (val-batch fix in, gen re-enabled via NAVI_GEN=1 default path)
@@ -38,10 +42,10 @@ Second kernel loss of the day; first was ~13:41 (run18/19 era).
    NAVI_STEPS=20000 NAVI_GEN=1 NAVI_GEN_EVERY=1000 \
    nohup python3 code/experiments/train500m_bpe.py > train.log 2>&1 &
    (fresh start - no ckpts survive; ~8min compile, then ~2.1s/step, 20k steps ~ 12-17h)
-3. Generation at step 0 fires first - that is the deadlock test. If it hangs
-   again (no GEN lines in ~3min), the fix to try: batch the generate loop with
-   lax.scan, or pre-compile generate_step with static shape (1,SEQ) + padded
-   KV, or fall back to NAVI_GEN=0 + offline generation from ckpt.
+3. Generation at step 0 fires first - with the new scan path, expect a
+   ~4min compile after VAL@0, then 4 GEN lines within seconds of each
+   other. If no GEN line ~10min after VAL@0: kill, relaunch with
+   NAVI_GEN=0 (training unaffected), generate offline from ckpt later.
 4. Watch: first CKPT line at step 499 (~17min after stepping starts).
 5. Disk: need ~9GB free for keep-2 ckpts (4.6GB x2) + 4GB hf_cache; delete
    genpolish_params.pkl/tokenizer_corpus.txt if present.

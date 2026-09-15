@@ -73,11 +73,52 @@ def reshard_tree(tree):
     return jax.tree_util.tree_map_with_path(place, tree)
 
 
-def load_ckpt_sharded(path):
+def _is_namedtuple(t):
+    return isinstance(t, tuple) and hasattr(type(t), "_fields")
+
+
+def _merge_opt_state(new_state, old_state):
+    """Migrate a checkpointed optax state onto the CURRENT transform's
+    state structure. Arrays (optimizer moments) come from the checkpoint;
+    structurally-new leaves (e.g. the schedule `count` added when an LR
+    schedule is introduced) start fresh from new_state. Handles optax's
+    namedtuple/tuple/dict state nesting."""
+    if isinstance(old_state, jax.Array):
+        return old_state
+    if _is_namedtuple(new_state):
+        fields = {}
+        for f in type(new_state)._fields:
+            vn = getattr(new_state, f)
+            vo = getattr(old_state, f, None)
+            fields[f] = _merge_opt_state(vn, vo) if vo is not None else vn
+        return type(new_state)(**fields)
+    if isinstance(new_state, tuple):
+        if isinstance(old_state, tuple) and len(old_state) == len(new_state):
+            return tuple(_merge_opt_state(a, b)
+                         for a, b in zip(new_state, old_state))
+        if isinstance(old_state, tuple) and len(old_state) < len(new_state):
+            head = [_merge_opt_state(a, b)
+                    for a, b in zip(new_state[:len(old_state)], old_state)]
+            return tuple(head) + tuple(new_state[len(old_state):])
+        return new_state
+    if isinstance(new_state, dict) and isinstance(old_state, dict):
+        return {k: (_merge_opt_state(v, old_state[k]) if k in old_state else v)
+                for k, v in new_state.items()}
+    return new_state
+
+
+def load_ckpt_sharded(path, new_opt_state=None):
+    """Load params/opt; when new_opt_state (fresh tx.init() output of the
+    CURRENT transform) is given, migrate the loaded state onto that
+    structure - required when the tx structure changed across a restart
+    (e.g. adding an LR schedule adds a count leaf)."""
     with open(path, "rb") as f:
         st = pickle.load(f)
     p = reshard_tree(st["params"])
     o = reshard_tree(st["opt"])
+    if new_opt_state is not None:
+        o = _merge_opt_state(new_opt_state, o)
+        o = reshard_tree(o)
     return p, o, st["step"], st
 
 
@@ -271,7 +312,7 @@ def main():
             ckpt_path = os.path.join(CKPT_DIR, ckpts[-1])
             del p, o
             gc.collect()
-            p, o, start, _ = load_ckpt_sharded(ckpt_path)
+            p, o, start, _ = load_ckpt_sharded(ckpt_path, new_opt_state=o)
             print(f"[{TAG}] RESUMED from {ckpt_path} at step {start}", flush=True)
 
     def make_step(temp):

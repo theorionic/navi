@@ -63,22 +63,40 @@ class ProductKeyMemory(nn.Module):
         q1, q2 = q[..., 0, :], q[..., 1, :]
         s1 = jnp.einsum("blcd,ckd->blck", q1, self.k1)
         s2 = jnp.einsum("blcd,ckd->blck", q2, self.k2)
-        # two-sided filter; with side_top=16 the side^2 grid is ~134MB at
-        # b=512 - fully vectorized, no chunk loop, no scan.
-        # ponytail: jax.lax.top_k operates on the last axis
-        i1 = jax.lax.top_k(s1, c.side_top)[1]
+        # two-sided filter; side_top candidates per side, then the product
+        # grid. With side_top=64 and c1=c2=512 the grid covers only 1.56%
+        # of slots - measured routing collapse sits exactly at that ceiling
+        # (run22f: 0.9-3.5% alive). Side_top=128 raises reach to 6.2%, but
+        # the (side,side) grid must be built per class (lax.map over the
+        # class axis) to keep the transient at today's 8.6GB peak: classes
+        # are independent planes, so chunking is EXACT, not approximate.
+        i1 = jax.lax.top_k(s1, c.side_top)[1]  # (b, l, classes, side)
         i2 = jax.lax.top_k(s2, c.side_top)[1]
         g1 = jnp.take_along_axis(s1, i1, axis=-1)
         g2 = jnp.take_along_axis(s2, i2, axis=-1)
-        sub = g1[..., :, None] + g2[..., None, :]  # (b, l, classes, side, side)
-        side = sub.shape[-2]
-        flat = sub.reshape(b, l, c.n_classes, side * side)
-        f_idx = jax.lax.top_k(flat, c.cand_k)[1]
+
+        def class_grid(gs):
+            g1c, g2c = gs
+            # (b, l, side) x 2 -> (b, l, side*side) scores + flat pair ids
+            sub = g1c[..., :, None] + g2c[..., None, :]
+            side = sub.shape[-2]
+            flat = sub.reshape(b, l, side * side)
+            k = min(c.cand_k, side * side)
+            f_idx = jax.lax.top_k(flat, k)[1]
+            scores = jnp.take_along_axis(flat, f_idx, -1)
+            return f_idx, scores
+
+        # map over the class axis: bring classes to the leading axis first
+        # (classes are independent planes, so per-class chunking is exact)
+        g1c, g2c = jnp.moveaxis(g1, 2, 0), jnp.moveaxis(g2, 2, 0)
+        f_idx, scores = jax.lax.map(class_grid, (g1c, g2c))
+        f_idx = jnp.moveaxis(f_idx, 0, 2)
+        scores = jnp.moveaxis(scores, 0, 2)
+        side = c.side_top
         r, col = f_idx // side, f_idx % side
         pi1 = jnp.take_along_axis(i1, r, axis=-1)
         pi2 = jnp.take_along_axis(i2, col, axis=-1)
         slots = pi1 * c.c2 + pi2
-        scores = jnp.take_along_axis(flat, f_idx, -1)
         v = self.values[jnp.arange(c.n_classes)[None, None, :, None], slots]
         t = c.score_temp if temp is None else temp
         w = jax.nn.softmax(t * scores, axis=-1)

@@ -49,3 +49,17 @@ compare against the baseline checkpoint (019999) with the same protocol.
   load-bearing at 4k).
 - Watch item: mem_2 distinct 3.4% falling, top100 29%. Alarm thresholds:
   top100 >60% or distinct <1%.
+
+## Full-pool ablation @ step 4000 (user-requested)
+- base 5.6565 | zero 5.3767 (-280mbpc) | random 5.7070 (+50mbpc)
+  | shuffle 5.8335 (+177mbpc)
+- zero HELPS -280mbpc: current pool contents net-harmful on val at 4k
+  (consistent with kill test). BUT:
+- trained values beat RANDOM values (+50) and beat SHUFFLED values
+  (+177, worst). Ordering: shuffled > random > zero > base.
+  => the model DEPENDS on slot-specific value content: right values in
+  wrong slots is maximally misleading. The pool stores slot-bound
+  information the model uses; it is just not yet net-positive because
+  read magnitudes mislead more than they inform at 4k.
+- Expected trajectory: base should overtake zero when values become
+  load-bearing (~8-12k). Zero-ablation delta is THE metric to track.

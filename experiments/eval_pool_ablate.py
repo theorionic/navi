@@ -63,11 +63,6 @@ def main():
     cfg = ModelConfig(d_model=512, n_layers=8, n_heads=8, memory_every=2,
                       vocab_size=VOCAB)
     model = Navi(cfg, mem_cfg)
-    # no-memory variant: same model class, but every Block has
-    # use_memory=False - build a config with memory_every=0
-    cfg_nomem = ModelConfig(d_model=512, n_layers=8, n_heads=8,
-                            memory_every=0, vocab_size=VOCAB)
-    model_nomem = Navi(cfg_nomem, mem_cfg)
 
     from grain_parquet_data import PhaseFeed
     feed = PhaseFeed(buffer_mb=64, val_docs=1000)
@@ -117,16 +112,15 @@ def main():
     log(f"shuffle (rows permuted):   {shuf:.4f}  "
         f"({1000*(shuf-base):+.1f} mbpc)")
 
-    # no memory at all
-    nomem = bpc_of(model_nomem, p, val, rng, hi)
-    log(f"nomem (PKM skipped):       {nomem:.4f}  "
-        f"({1000*(nomem-base):+.1f} mbpc)")
-
+    # NOTE: the structural no-memory variant is omitted: with
+    # memory_every=0 the even blocks become FF-only and the checkpoint's
+    # block trees don't match (mem blocks lack ff_in). The zero condition
+    # already isolates the pool's value contribution (a zeroed read
+    # contributes exactly nothing to h).
     log(f"step {step} verdict: "
         f"pool better than zero: {base < zero}, "
         f"better than random: {base < rand}, "
-        f"better than shuffled: {base < shuf}, "
-        f"memory helps vs no-memory: {base < nomem}")
+        f"better than shuffled: {base < shuf}")
 
 
 if __name__ == "__main__":

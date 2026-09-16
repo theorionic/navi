@@ -155,7 +155,12 @@ def make_tx(params, total_steps):
         end_value=LR * 0.05)
     core = optax.lion(learning_rate=sched_core, b1=0.9, b2=0.99,
                       weight_decay=0.03)
-    mem = optax.lion(learning_rate=LR, b1=0.9, b2=0.99, weight_decay=0.0)
+    # mem values get their OWN lr (default = LR). NAVI_MEM_LR=3e-3 is the
+    # documented intent that was never wired: sign-based Lion ignores the
+    # grad-scale hack, so value consolidation needs a real lr bump.
+    mem_lr = float(os.environ.get("NAVI_MEM_LR", str(LR)))
+    mem = optax.lion(learning_rate=mem_lr, b1=0.9, b2=0.99,
+                     weight_decay=0.0)
     labels = jax.tree_util.tree_map_with_path(
         lambda kp, _: "mem" if is_mem(kp) else "core", params)
     return optax.multi_transform({"core": core, "mem": mem}, labels)

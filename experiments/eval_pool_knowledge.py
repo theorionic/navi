@@ -160,7 +160,8 @@ def main():
         for _ in range(4):
             offs = rng.integers(0, hi, size=4)
             idx = offs[:, None] + np.arange(SEQ + 1)[None, :]
-            ids = jnp.asarray(val[idx][:, :-1])
+            tg = jnp.asarray(val[idx][:, 1:])
+            logits = model.apply(params, ids, train=False)
             l = optax.softmax_cross_entropy_with_integer_labels(logits, tg)
             tot += float(l.mean()); n += 1
         return tot / n / np.log(2)

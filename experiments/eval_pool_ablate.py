@@ -60,6 +60,9 @@ def main():
 
     mem_cfg = MemoryConfig(c1=512, c2=512, cand_k=8, side_top=64,
                            n_classes=4, score_temp=4.0)
+    cfg = ModelConfig(d_model=512, n_layers=8, n_heads=8, memory_every=2,
+                      vocab_size=VOCAB)
+    model = Navi(cfg, mem_cfg)
     # no-memory variant: same model class, but every Block has
     # use_memory=False - build a config with memory_every=0
     cfg_nomem = ModelConfig(d_model=512, n_layers=8, n_heads=8,

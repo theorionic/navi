@@ -36,3 +36,16 @@ compare against the baseline checkpoint (019999) with the same protocol.
 - Probe had 4 bugs (aux keys, window indexing, jax.nn->optax, stale
   outer ids closure) - all fixed, committed e9e493d..c5b10f5.
 - Training rebuild: step 2400 loss 3.97, 41k tok/s, ETA ~15.7h.
+
+## Utilization trend (1k -> 3k -> 4k batteries, rebuild run)
+- alive%: b0 98.2->99.1, b2 52.7->78.3->78.4, b4 45.4->81.8->82.6,
+  b6 51.1->85.0->87.2. Sharp growth to 3k, plateau after.
+- routing distinct%: mem_0 18.7->13.5->13.4 (stable); mem_2 5.8->4.6->3.4
+  (concentrating, top100 16->23.5->29.2%); mem_4 7.6->6.5->5.2;
+  mem_6 7.9->8.0->7.4. Gini 0.67-0.83 -> 0.73-0.88. Addressing intact
+  (Jaccard 0.84-0.90 stable).
+- kill: hot vs rand = -119 vs -341 mbpc @4k (hot carries 2.9x more
+  signal than random, both still negative => values not yet
+  load-bearing at 4k).
+- Watch item: mem_2 distinct 3.4% falling, top100 29%. Alarm thresholds:
+  top100 >60% or distinct <1%.

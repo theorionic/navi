@@ -241,7 +241,7 @@ def pool_coverage(model_ra, params, val_tokens, n_batches=2):
     aux['mem_L'] is (b, l, classes*cand_k), CLASS-MAJOR (pkm.py packs
     slots.reshape(b, l, -1) from (b, l, classes, cand_k)).
     """
-    n_slots = 512 * 512 * 4  # c1*c2*n_classes, fixed by this run's config
+    n_slots = (int(os.environ.get("NAVI_C_POOL", "512")) ** 2) * 4
     rng = np.random.default_rng(11)
     hi = len(val_tokens) - SEQ - 2
     per_block = {}
@@ -272,10 +272,16 @@ def do_generation(model, params, tok, step_i):
 def main():
     print(f"== bpe500m: BS={BS} SEQ={SEQ} STEPS={STEPS} gen@{GEN_EVERY} "
           f"cores={jax.device_count()} ==", flush=True)
-    mem_cfg = MemoryConfig(c1=512, c2=512, cand_k=CAND_K, side_top=64,
-                           n_classes=4, score_temp=TEMP_END)
-    cfg_m = ModelConfig(d_model=512, n_layers=8, n_heads=8, memory_every=2,
-                        vocab_size=VOCAB)
+    D_MODEL = int(os.environ.get("NAVI_D_MODEL", "512"))
+    N_LAYERS = int(os.environ.get("NAVI_N_LAYERS", "8"))
+    N_HEADS = int(os.environ.get("NAVI_N_HEADS", "8"))
+    C_POOL = int(os.environ.get("NAVI_C_POOL", "512"))
+    SIDE_TOP = int(os.environ.get("NAVI_SIDE_TOP", "64"))
+    mem_cfg = MemoryConfig(c1=C_POOL, c2=C_POOL, cand_k=CAND_K,
+                           side_top=SIDE_TOP, n_classes=4,
+                           score_temp=TEMP_END)
+    cfg_m = ModelConfig(d_model=D_MODEL, n_layers=N_LAYERS,
+                        n_heads=N_HEADS, memory_every=2, vocab_size=VOCAB)
     model = Navi(cfg_m, mem_cfg)
     model_ra = Navi(cfg_m, mem_cfg, return_aux=True)  # coverage eval only
     p0 = init_params(model, SEQ, jax.random.PRNGKey(0))

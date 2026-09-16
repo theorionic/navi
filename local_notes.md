@@ -63,3 +63,15 @@ compare against the baseline checkpoint (019999) with the same protocol.
   read magnitudes mislead more than they inform at 4k.
 - Expected trajectory: base should overtake zero when values become
   load-bearing (~8-12k). Zero-ablation delta is THE metric to track.
+
+## 8k validation (user-directed checkpoint check)
+- ablation: base 5.4403 | zero 5.1513 (-289mbpc) | random 5.4988 (+58)
+  | shuffle 5.6180 (+178). ALL GAPS FROZEN vs 4k (-280/+50/+177).
+  Pool values NOT consolidating into usable knowledge.
+- probe: alive% b6 89.9 (slow growth); concentration rising everywhere:
+  mem_2 distinct 2.0% top100 37.7% Gini 0.905; mem_0 8.7%/9.1%/0.790.
+  Addressing intact (0.85-0.92). mem_2 trending toward alarm by ~20k.
+- VAL 5.4487 @8k monotone.
+- Root cause of frozen gaps: mem lr effectively 3e-4 (not 3e-3 as the
+  docstring claims) + Lion sign-based update neutralizes the x10 grad
+  scale. Action for run23: real mem lr 3e-3.

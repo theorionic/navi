@@ -25,6 +25,10 @@ import gc
 import os
 import pickle
 import time
+import os as _os
+_os.environ.setdefault("JAX_COMPILATION_CACHE_DIR", "/kaggle/working/jax_cache")
+_os.environ.setdefault("JAX_PERSISTENT_CACHE_MIN_COMPILE_TIME_SECS", "0")
+_os.environ.setdefault("JAX_PERSISTENT_CACHE_MIN_ENTRY_SIZE_BYTES", "-1")
 
 import jax
 import jax.numpy as jnp

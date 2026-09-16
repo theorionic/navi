@@ -92,9 +92,10 @@ def main():
     log("== 2. routing traffic (collapse = distinct ~ cand_k, Gini -> 1)")
     n_batches = 8
     slot_sets = {}
-    for bi in range(4):
+    read_counts = {}
+    for bi in range(0, 8, 2):
         slot_sets[f"mem_{bi}"] = set()
-    read_counts = {f"mem_{bi}": {} for bi in range(4)}
+        read_counts[f"mem_{bi}"] = {}
     for _ in range(n_batches):
         offs = rng.integers(0, hi, size=8)
         idx = offs[:, None] + np.arange(SEQ + 1)[None, :]
@@ -168,33 +169,34 @@ def main():
     base_bpc = val_bpc(p)
     # hottest slots: union of top read-count keys across blocks, as slot ids
     hot_by_block = {}
-    for bi in range(4):
-        name = f"mem_{bi}"
+    mem_blocks = [0, 2, 4, 6]
+    for blk in mem_blocks:
+        name = f"mem_{blk}"
         rc = read_counts[name]
         top = sorted(rc.items(), key=lambda kv: -kv[1])[:len(rc) // 100 or 100]
-        hot_by_block[bi] = top
+        hot_by_block[blk] = top
     p_hot = jax.tree_util.tree_map(lambda x: x, p)
     ph = p_hot.get("params", p_hot)
     killed = 0
-    for bi in range(4):
-        v = ph[f"block_{2*bi}"]["mem"]["values"]  # mem blocks are even
-        cls_ids = np.asarray([k[0] for k, _ in hot_by_block[bi]])
-        slot_ids = np.asarray([k[1] for k, _ in hot_by_block[bi]])
+    for blk in mem_blocks:
+        v = ph[f"block_{blk}"]["mem"]["values"]
+        cls_ids = np.asarray([k[0] for k, _ in hot_by_block[blk]])
+        slot_ids = np.asarray([k[1] for k, _ in hot_by_block[blk]])
         v = v.at[cls_ids, slot_ids, :].set(0.0)
-        ph[f"block_{2*bi}"]["mem"]["values"] = v
+        ph[f"block_{blk}"]["mem"]["values"] = v
         killed += len(cls_ids)
     hot_bpc = val_bpc(p_hot)
     # random kill, same count
     p_rand = jax.tree_util.tree_map(lambda x: x, p)
     pr = p_rand.get("params", p_rand)
     rng2 = np.random.default_rng(7)
-    for bi in range(4):
-        v = pr[f"block_{2*bi}"]["mem"]["values"]
+    for blk in mem_blocks:
+        v = pr[f"block_{blk}"]["mem"]["values"]
         n_cls, n_slot = v.shape[0], v.shape[1]
-        pick_c = rng2.integers(0, n_cls, size=hot_by_block[bi].__len__())
-        pick_s = rng2.integers(0, n_slot, size=hot_by_block[bi].__len__())
+        pick_c = rng2.integers(0, n_cls, size=len(hot_by_block[blk]))
+        pick_s = rng2.integers(0, n_slot, size=len(hot_by_block[blk]))
         v = v.at[pick_c, pick_s, :].set(0.0)
-        pr[f"block_{2*bi}"]["mem"]["values"] = v
+        pr[f"block_{blk}"]["mem"]["values"] = v
     rand_bpc = val_bpc(p_rand)
     log(f"  step {step}: base {base_bpc:.4f} | hot-kill {hot_bpc:.4f} "
         f"(+{1000*(hot_bpc-base_bpc):.2f} mbpc) | rand-kill {rand_bpc:.4f} "

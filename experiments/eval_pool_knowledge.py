@@ -131,7 +131,7 @@ def main():
             out[name] = set(map(int, a.reshape(-1)))
         return out
 
-    base = val[rng.integers(0, hi)]
+    base = val[rng.integers(0, hi, size=SEQ + 1)]
     s1 = slots_for(base)
     s2 = slots_for(base)  # determinism sanity: must be identical
     for name in sorted(s1):
@@ -144,7 +144,7 @@ def main():
     rare = (VOCAB - 8 + np.arange(8)) % VOCAB
     w_a = base.copy(); w_a[100:108] = rare
     w_b = base.copy(); w_b[300:308] = rare
-    w_rand = val[rng.integers(0, hi)]
+    w_rand = val[rng.integers(0, hi, size=SEQ + 1)]
     sa, sb, sr = slots_for(w_a), slots_for(w_b), slots_for(w_rand)
     for name in sorted(sa):
         jab = len(sa[name] & sb[name]) / max(1, len(sa[name] | sb[name]))

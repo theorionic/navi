@@ -22,3 +22,17 @@ compare against the baseline checkpoint (019999) with the same protocol.
   verified with tiny local probe: fresh random router, 2x32 tokens ->
   ~900-1300 distinct slots of 16384 per mem layer (5-8%); matches the
   kernel COV@0 3-4% baseline. Routing machinery itself spreads.
+
+## Step-1000 knowledge battery (rebuild ckpt, 2026-09-16)
+- VALUES: b0 alive 98.2% norm 0.911 (init 0.016 -> 56x), Gini 0.089;
+  b2/4/6 alive 45-53%, norm 1.0-1.2, Gini 0.11-0.18. Rows are written.
+- ROUTING: mem_0 distinct 18.7% top100 3.2% Gini 0.665; mem_2/4/6
+  distinct 5.8-7.9% top100 10-16% Gini 0.80-0.83. No collapse.
+- REPRO: self-Jaccard 1.000; same-rare 0.88-0.90 vs rand 0.15-0.29
+  => CONTENT-ADDRESSED reads (the router learned addressing).
+- KILL @1000: base 7.0854, hot-kill 7.0043 (-81mbpc), rand-kill 6.9229
+  (-162mbpc) - both kills IMPROVE: values still noise at step 1000,
+  not yet load-bearing. Re-test at 5k/8k.
+- Probe had 4 bugs (aux keys, window indexing, jax.nn->optax, stale
+  outer ids closure) - all fixed, committed e9e493d..c5b10f5.
+- Training rebuild: step 2400 loss 3.97, 41k tok/s, ETA ~15.7h.

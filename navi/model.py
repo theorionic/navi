@@ -7,12 +7,18 @@ tensors that ever need to leave the resident device -> exactly the seam
 where the RAM/disk tier plugs in.
 """
 
+import os
+
 import jax.numpy as jnp
 from flax import linen as nn
 from flax.typing import Array
 
 from navi.config import MemoryConfig, ModelConfig
 from navi.pkm import ProductKeyMemory
+
+
+def _identity(cls):
+    return cls
 
 
 class Block(nn.Module):
@@ -68,10 +74,12 @@ class Navi(nn.Module):
     def setup(self) -> None:
         self.embed = nn.Embed(self.cfg.vocab_size, self.cfg.d_model, name="embed")
         # remat per block: 16 materialized causal-attention softmaxes at
-        # BS=256/SEQ=512 cost ~4.3GB HBM for backward (32x512x512 fp32 per
-        # layer); recomputing per block trades ~30% step time for fitting.
+        # BS=256/SEQ=512 cost ~4.3GB HBM for backward; recompute trades
+        # ~30% step time for fitting. NAVI_REMAT=0 skips it for small
+        # models whose activations fit trivially.
+        BlockCls = Block if os.environ.get("NAVI_REMAT", "1") == "1" else _identity(Block)
         self.blocks = [
-            nn.remat(Block)(
+            BlockCls(
                 cfg=self.cfg,
                 use_memory=(
                     self.cfg.memory_every > 0

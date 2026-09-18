@@ -46,7 +46,7 @@ SEQ = int(os.environ.get("NAVI_SEQ", "512"))
 GEN_EVERY = int(os.environ.get("NAVI_GEN_EVERY", "1000"))
 CAND_K = int(os.environ.get("NAVI_CAND_K", "8"))
 TEMP_END = float(os.environ.get("NAVI_TEMP_END", "4.0"))
-CKPT_DIR = "/kaggle/working/experiments"
+CKPT_DIR = os.environ.get("NAVI_CKPT_DIR", "/kaggle/working/experiments")
 CKPT_PREFIX = "ckpt_bpe500m_step"
 GEN_ON = os.environ.get("NAVI_GEN", "1") == "1"
 GEN_LEN = 128
@@ -128,18 +128,27 @@ def load_ckpt_sharded(path, new_opt_state=None):
 
 
 def temp_at(step_i):
-    f = min(1.0, step_i / 3000)
-    return f  # single temp 1.0 in this run (baseline recipe, no anneal knobs)
+    # NAVI_TEMP_START: initial softmax temperature. Router grads scale with
+    # temp, so 0.0 keeps the router frozen for the whole ramp; 0.5+ lets
+    # routing learn from step 0. Ramps to 1.0 over NAVI_TEMP_RAMP steps.
+    t0 = float(os.environ.get("NAVI_TEMP_START", "0.0"))
+    ramp = float(os.environ.get("NAVI_TEMP_RAMP", "3000"))
+    f = t0 + (1.0 - t0) * min(1.0, step_i / ramp)
+    return f
 
 
 def loss_fn(model, p, ids, tg, temp):
     out = model.apply(p, ids, train=True, mem_temp=temp)
     return optax.softmax_cross_entropy_with_integer_labels(out, tg).mean()
 
-
 def is_mem(kp):
+    # keystr uses bracket format: "['params']['block_0']['mem']['k1']".
+    # The old "/k1" / "/k2" checks NEVER matched (dot-format assumption),
+    # so k1/k2 were silently labeled "core" and trained with Lion+wd --
+    # weight decay actively shrinking the router keys. Match 'k1'/'k2'
+    # as quoted tokens so 'block_1' can't false-positive.
     ks = jax.tree_util.keystr(kp)
-    return "values" in ks or "/k1" in ks or "/k2" in ks
+    return "values" in ks or "'k1'" in ks or "'k2'" in ks
 
 
 LR = float(os.environ.get("NAVI_LR", "3e-4"))
@@ -164,8 +173,21 @@ def make_tx(params, total_steps):
     # documented intent that was never wired: sign-based Lion ignores the
     # grad-scale hack, so value consolidation needs a real lr bump.
     mem_lr = float(os.environ.get("NAVI_MEM_LR", str(LR)))
-    mem = optax.lion(learning_rate=mem_lr, b1=0.9, b2=0.99,
-                     weight_decay=0.0)
+    # ISSUE-01 deeper fix: Lion caps each value slot's effective step at
+    # mem_lr no matter how many tokens read it in a step (grad summed over
+    # batch*positions, then sign() collapses touch count into one vote).
+    # Adam accumulates a per-slot momentum across touches (m/sqrt(v)
+    # normalization), so a hot slot that is consistently read gets
+    # lr-sized consolidation steps that COMPOUND - the "per-slot
+    # accumulated momentum / bigger effective steps per touch" lever from
+    # ISSUES.md. A/B'd against the Lion baseline (mem_lr=3e-4) on the
+    # base-vs-zero ablation battery; NAVI_MEM_OPT=adam|lion selects.
+    mem_opt = os.environ.get("NAVI_MEM_OPT", "adam")
+    if mem_opt == "adam":
+        mem = optax.adam(learning_rate=mem_lr, b1=0.9, b2=0.999)
+    else:
+        mem = optax.lion(learning_rate=mem_lr, b1=0.9, b2=0.99,
+                         weight_decay=0.0)
     labels = jax.tree_util.tree_map_with_path(
         lambda kp, _: "mem" if is_mem(kp) else "core", params)
     return optax.multi_transform({"core": core, "mem": mem}, labels)
@@ -284,7 +306,9 @@ def main():
     SIDE_TOP = int(os.environ.get("NAVI_SIDE_TOP", "64"))
     mem_cfg = MemoryConfig(c1=C_POOL, c2=C_POOL, cand_k=CAND_K,
                            side_top=SIDE_TOP, n_classes=4,
-                           score_temp=TEMP_END)
+                           score_temp=TEMP_END,
+                           lb_weight=float(os.environ.get("NAVI_LB_WEIGHT", "0.0")),
+                           lb_eps=float(os.environ.get("NAVI_LB_EPS", "0.0")))
     cfg_m = ModelConfig(d_model=D_MODEL, n_layers=N_LAYERS,
                         n_heads=N_HEADS, memory_every=2, vocab_size=VOCAB)
     model = Navi(cfg_m, mem_cfg)
@@ -313,8 +337,18 @@ def main():
                           "docs_done": 0, "global_step": 0, "finished": False}
     else:
         feed.load_state()
-    ready = feed.wait_ready(min_tokens=BS * SEQ * 8, timeout=900)
+    # Pre-fill the data buffer to its FULL capacity (or 60s of producer
+    # work, whichever first) before stepping. Previously readiness was
+    # BS*SEQ*8 tokens (~65KB) - training started while the producer thread
+    # was still downloading+tokenizing the first parquet shard, and its
+    # GIL-heavy python work starved the training loop's dispatch path:
+    # steps 0-300 ran at 5-7s instead of 213ms until the buffer filled.
+    # Waiting for a full buffer moves that cost into startup, where it
+    # overlaps the step compile, instead of into the first 300 steps.
+    _prefill = min(feed.cap, int(os.environ.get("NAVI_PREFILL_MB", "512")) * 1024 * 1024)
+    ready = feed.wait_ready(min_tokens=_prefill, timeout=900)
     print(f"[{TAG}] feed ready={ready}: buf {len(feed)//(1024*1024)}MB "
+          f"(prefill target {_prefill//(1024*1024)}MB) "
           f"val {feed.val_end//1024}KB", flush=True)
     rng = np.random.default_rng(0)
     val = feed.val[:feed.val_end].copy()
@@ -334,46 +368,104 @@ def main():
             gc.collect()
             print(f"[{TAG}] RESUMED from {ckpt_path} at step {start}", flush=True)
 
-    def make_step(temp):
-        @jax.jit
-        def step(pp, oo, ids, tg):
-            g = jax.grad(lambda q, a, t: loss_fn(model, q, a, t, temp))(pp, ids, tg)
-            gm = jax.tree_util.tree_map_with_path(
-                lambda kp, x: x if is_mem(kp) else jnp.zeros_like(x), g)
-            gc_ = jax.tree_util.tree_map_with_path(
-                lambda kp, x: jnp.zeros_like(x) if is_mem(kp) else x, g)
-            g = jax.tree_util.tree_map_with_path(
-                lambda kp, x: x * 10.0 if is_mem(kp) else x, g)
-            u, oo2 = tx.update(g, oo, pp)
-            nrm = (jnp.sqrt(jax.tree_util.tree_reduce(
-                        lambda a, x: a + jnp.sum(x * x), gc_, jnp.float32(0.0))),
-                   jnp.sqrt(jax.tree_util.tree_reduce(
-                        lambda a, x: a + jnp.sum(x * x), gm, jnp.float32(0.0))))
-            return optax.apply_updates(pp, u), oo2, nrm
-        return step
+    # temp is a TRACED argument, not a Python closure float: a closure float
+    # changes identity whenever the schedule moves, and each distinct float
+    # bakes a new constant into the HLO -> full recompile (O(minutes) for the
+    # 500M graph) per temp value. As a traced scalar it rides along with the
+    # batch and the step compiles exactly once.
+    @jax.jit
+    def step(pp, oo, ids, tg, temp):
+        l, g = jax.value_and_grad(
+            lambda q, a, t: loss_fn(model, q, a, t, temp))(pp, ids, tg)
+        u, oo2 = tx.update(g, oo, pp)
+        return optax.apply_updates(pp, u), oo2, l, g
 
-    step = make_step(temp_at(0))
+    # Grad norms for the log line: the step returns the loss and grads;
+    # norms are computed from the last grads ONLY at log steps (one host
+    # sync per 50 steps, none between). The dead 10x mem grad-scale is gone:
+    # per-group LRs now live solely in make_tx (NAVI_MEM_LR).
+    @jax.jit
+    def grad_norms(g):
+        gm = jax.tree_util.tree_map_with_path(
+            lambda kp, x: x if is_mem(kp) else jnp.zeros_like(x), g)
+        gc_ = jax.tree_util.tree_map_with_path(
+            lambda kp, x: jnp.zeros_like(x) if is_mem(kp) else x, g)
+        return (
+            jnp.sqrt(jax.tree_util.tree_reduce(
+                lambda a, x: a + jnp.sum(x * x), gc_, jnp.float32(0.0))),
+            jnp.sqrt(jax.tree_util.tree_reduce(
+                lambda a, x: a + jnp.sum(x * x), gm, jnp.float32(0.0))))
+
+    # [dbg:grads] NAVI_GRAD_DEBUG=1: per-parameter-group grad norms + param
+    # norms for EVERY pool tensor (w_q/k1/k2/values/w_o per block) plus the
+    # backbone (embed/head/attn/ff). This is the kill-shot diagnostic: it
+    # shows exactly which link in the chain receives zero learning signal.
+    DBG_GRADS = os.environ.get("NAVI_GRAD_DEBUG", "0") == "1"
+
+    def _group_of(ks):
+        if "'values'" in ks:
+            return "values"
+        if "'k1'" in ks or "'k2'" in ks:
+            return "keys"
+        if "'w_q'" in ks:
+            return "w_q"
+        if "'w_o'" in ks:
+            return "w_o"
+        return "core"
+
+    @jax.jit
+    def grad_debug(g, pp):
+        groups = {"values": jnp.float32(0.0), "keys": jnp.float32(0.0),
+                  "w_q": jnp.float32(0.0), "w_o": jnp.float32(0.0),
+                  "core": jnp.float32(0.0)}
+        for kp, x in jax.tree_util.tree_flatten_with_path(g)[0]:
+            k = _group_of(jax.tree_util.keystr(kp))
+            groups[k] = groups[k] + jnp.sum(x.astype(jnp.float32) ** 2)
+        pnorms = dict(groups)
+        for kp, x in jax.tree_util.tree_flatten_with_path(pp)[0]:
+            k = _group_of(jax.tree_util.keystr(kp))
+            pnorms[k] = pnorms[k] + jnp.sum(x.astype(jnp.float32) ** 2)
+        return {k: jnp.sqrt(v) for k, v in groups.items()}, \
+            {k: jnp.sqrt(v) for k, v in pnorms.items()}
 
     keep = int(os.environ.get("NAVI_KEEP_CKPT", "2"))
     losses, gn_hist, val_hist, cov_hist = [], [], [], []
     t0 = time.time()
+    t_last = t0
+    ema_ms = None       # EMA of per-step wall time (steady-state pace)
+    g_last = None
     for i in range(start, STEPS):
         win = feed.batch(rng, BS, SEQ)
         ids = jax.device_put(win[:, :-1], BATCH)
         tg = jax.device_put(win[:, 1:], BATCH)
-        p, o, (gn_core, gn_mem) = step(p, o, ids, tg)
+        p, o, l, g_last = step(p, o, ids, tg, temp_at(i))
+        now = time.time()
+        step_ms = (now - t_last) * 1000.0
+        t_last = now
+        ema_ms = step_ms if ema_ms is None else 0.9 * ema_ms + 0.1 * step_ms
         if i % 50 == 0 or i == STEPS - 1:
-            l = float(loss_fn(model, p, ids, tg, temp_at(i)))
-            losses.append((i, l))
-            tps = (i - start + 1) * BS * SEQ / max(1e-9, time.time() - t0)
-            eta_s = (STEPS - i - 1) * BS * SEQ / max(1e-9, tps)
-            print(f"[{TAG}] step {i:5d}/{STEPS} loss {l:.4f} "
-                  f"bpc {l/np.log(2):.4f} gn(core) {gn_core:.3f} "
-                  f"gn(mem) {gn_mem:.3f} ({tps/1e3:.0f}k tok/s "
-                  f"eta {eta_s/3600:.1f}h) buf {len(feed)//(1024*1024)}MB",
+            gn_core, gn_mem = jax.device_get(grad_norms(g_last))
+            losses.append((i, float(l)))
+            el = now - t0
+            tps = (i - start + 1) * BS * SEQ / max(1e-9, el)
+            inst_tps = BS * SEQ / max(1e-9, ema_ms / 1000.0)
+            eta_s = (STEPS - i - 1) * max(ema_ms, 1e-9) / 1000.0
+            print(f"[{TAG}] step {i:5d}/{STEPS} loss {float(l):.4f} "
+                  f"bpc {float(l)/np.log(2):.4f} gn(core) {gn_core:.3f} "
+                  f"gn(mem) {gn_mem:.3f} "
+                  f"step {ema_ms:.0f}ms inst {inst_tps/1e3:.0f}k tok/s "
+                  f"avg {tps/1e3:.0f}k tok/s eta {eta_s/3600:.1f}h "
+                  f"buf {len(feed)//(1024*1024)}MB "
+                  f"temp {float(temp_at(i)):.3f}",
                   flush=True)
+            if DBG_GRADS:
+                gnorms, pnorms = jax.device_get(grad_debug(g_last, p))
+                print(f"[{TAG}] [dbg:grads] step {i} " +
+                      " ".join(f"{k}:g={gnorms[k]:.4e}/p={pnorms[k]:.4e}"
+                               for k in ("values", "keys", "w_q", "w_o",
+                                         "core")), flush=True)
         if i % 100 == 99:
-            gn_hist.append((i, float(gn_core), float(gn_mem)))
+            gn_hist.append((i, float(gn_core), float(gn_mem)))  # from log block
         if i % GEN_EVERY == 0 or i == STEPS - 1:
             v = val_loss(model, p, val)
             val_hist.append((i, v))
@@ -384,6 +476,7 @@ def main():
                   " ".join(f"b{bi}={c*100:.1f}%" for bi, c in enumerate(cov)),
                   flush=True)
             ck = os.path.join(CKPT_DIR, f"{CKPT_PREFIX}{i:06d}.pkl")
+            os.makedirs(CKPT_DIR, exist_ok=True)
             with open(ck + ".tmp", "wb") as f:
                 pickle.dump({"params": p, "opt": o, "step": i,
                              "losses": losses, "val_hist": val_hist,
@@ -401,7 +494,11 @@ def main():
             feed.note_step(i)  # data_state global_step tracks ckpt step
 
     v = val_loss(model, p, val)
-    print(f"[{TAG}] VAL bpc {v:.4f}", flush=True)
+    el = time.time() - t0
+    print(f"[{TAG}] VAL final bpc {v:.4f} | total {el/3600:.2f}h "
+          f"| steady pace {ema_ms:.0f}ms/step "
+          f"| {STEPS - start} steps {BS*SEQ*max(1,STEPS-start)/max(1e-9,el)/1e3:.0f}k tok/s avg",
+          flush=True)
     print(f"[{TAG}] VAL_HIST " + " ".join(f"{s}:{b:.4f}" for s, b in val_hist),
           flush=True)
     print(f"[{TAG}] DONE", flush=True)

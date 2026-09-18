@@ -11,12 +11,24 @@ Value rows are the byte bulk -> the tier that gets offloaded to RAM/disk in
 the shipping design. Subkey tables stay resident next to the Reasoner.
 """
 
+import os
+
 import jax
 import jax.numpy as jnp
 from flax import linen as nn
 from flax.typing import Array
 
 from navi.config import MemoryConfig
+
+# NAVI_MEM_DEBUG=1 -> stage-by-stage jax.debug.print trace of the Pool read
+# path (query/router scores/top-k/values/weights/readout). Zero cost when
+# off: the flag is read at import time and the prints sit behind `if`.
+_MEM_DEBUG = os.environ.get("NAVI_MEM_DEBUG", "0") == "1"
+
+
+def _dbg(tag: str, name: str, *vals) -> None:
+    jax.debug.print("[dbg:" + tag + "] " + name + " "
+                    + " ".join(["{:.6f}"] * len(vals)), *vals)
 
 
 class ProductKeyMemory(nn.Module):
@@ -61,6 +73,10 @@ class ProductKeyMemory(nn.Module):
         """
         c = self.cfg
         b, l, _ = x.shape
+        if _MEM_DEBUG:
+            # [dbg:in] residual-stream stats entering the memory layer
+            _dbg("in", "x_mean x_std x_sqmean",
+                 x.mean(), x.std(), jnp.sqrt((x * x).mean()))
         if c.hash_slots:
             assert ctx_ids is not None, "hash_slots requires ctx_ids"
             return self._hash_path(x, ctx_ids)
@@ -68,6 +84,13 @@ class ProductKeyMemory(nn.Module):
         q1, q2 = q[..., 0, :], q[..., 1, :]
         s1 = jnp.einsum("blcd,ckd->blck", q1, self.k1)
         s2 = jnp.einsum("blcd,ckd->blck", q2, self.k2)
+        if _MEM_DEBUG:
+            # [dbg:score] router health: score spread vs key norm scale.
+            # std(s) ~ q_std * k_std * sqrt(per_class_dim); if the query
+            # norm collapses (dead w_q) or keys explode, this shows it.
+            _dbg("score", "s1_mean s1_std q1_std k1_norm",
+                 s1.mean(), s1.std(), q1.std(),
+                 jnp.sqrt((self.k1 * self.k1).mean()))
         # two-sided filter; side_top candidates per side, then the product
         # grid. With side_top=64 and c1=c2=512 the grid covers only 1.56%
         # of slots - measured routing collapse sits exactly at that ceiling
@@ -94,25 +117,22 @@ class ProductKeyMemory(nn.Module):
         g2_top = jax.lax.top_k(g2, g2k)[1]          # (b, l, classes, g2k)
         g2_vals = jnp.take_along_axis(g2, g2_top, axis=-1)
 
-        def class_grid(gs):
-            g1c, g2c = gs  # each (b, l, side) / (b, l, g2k) - class stripped
-            # build (side, g2k) grid, top over side*g2k pairs
-            sub = g1c[..., :, None] + g2c[..., None, :]  # (b,l,side,g2k)
-            side = sub.shape[-2]
-            flat = sub.reshape(b, l, side * g2k)
-            k = min(c.cand_k, side * g2k)
-            f_idx = jax.lax.top_k(flat, k)[1]
-            scores = jnp.take_along_axis(flat, f_idx, -1)
-            return f_idx, scores
-
-        # map over the class axis (classes are independent planes: exact)
-        g1c = jnp.moveaxis(g1, 2, 0)
-        g2c = jnp.moveaxis(g2_vals, 2, 0)
-        f_idx, scores = jax.lax.map(class_grid, (g1c, g2c))
+        # Batched class grid: classes are independent planes, and the
+        # top-k over each (side, g2k) sub-grid can run on ALL classes at
+        # once by folding the class axis into the batch. The old
+        # lax.map(class_grid, ...) unrolled 4 sequential TopK ops per
+        # block (16 per step fwd+bwd); this does ONE batched top_k.
+        # (b, l, classes, side, g2k) built via broadcasting -- no per-class loop.
+        sub = g1[..., :, None] + g2_vals[..., None, :]  # (b,l,C,side,g2k)
+        sub_b = sub.transpose(2, 0, 1, 3, 4)            # (C,b,l,side,g2k)
+        side = sub_b.shape[-2]
+        flat = sub_b.reshape(c.n_classes, b, l, side * g2k)
+        k = min(c.cand_k, side * g2k)
+        f_idx = jax.lax.top_k(flat, k)[1]               # (C,b,l,k)
+        scores = jnp.take_along_axis(flat, f_idx, -1)
         # (classes, b, l, k) -> (b, l, classes, k)
         f_idx = jnp.moveaxis(f_idx, 0, 2)
         scores = jnp.moveaxis(scores, 0, 2)
-        side = c.side_top
         r, col = f_idx // g2k, f_idx % g2k
         pi1 = jnp.take_along_axis(i1, r, axis=-1)
         pi2 = jnp.take_along_axis(i2, g2_top, axis=-1)
@@ -120,11 +140,22 @@ class ProductKeyMemory(nn.Module):
         slots = pi1 * c.c2 + pi2
         v = self.values[jnp.arange(c.n_classes)[None, None, :, None], slots]
         v = v.astype(jnp.float32)  # bf16 storage; math in fp32
+        if _MEM_DEBUG:
+            # [dbg:gather] value-table health at the point of read
+            _dbg("gather", "v_mean v_std", v.mean(), v.std())
         t = c.score_temp if temp is None else temp
         w = jax.nn.softmax(t * scores, axis=-1)
+        if _MEM_DEBUG:
+            # [dbg:w] softmax temperature effect: with t ramping from ~0,
+            # w -> uniform (max-min -> 0) and value-gradient concentration
+            # dies; this line quantifies exactly that.
+            _dbg("w", "w_mean w_min w_max", w.mean(), w.min(), w.max())
         if c.lb_eps > 0.0:
             w = w * (1.0 - c.lb_eps) + c.lb_eps / w.shape[-1]
         h = (w[..., None] * v).sum(axis=-2)
+        if _MEM_DEBUG:
+            # [dbg:out] the actual memory contribution magnitude
+            _dbg("h", "h_mean h_std", h.mean(), h.std())
         h = h.reshape(b, l, c.n_classes * self.per_class_dim)
         lb = jnp.float32(0.0)
         if c.lb_weight > 0.0:

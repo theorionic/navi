@@ -58,7 +58,6 @@ RUN22_CKPT = os.environ.get(
     "/kaggle/working/experiments/ckpt_bpe500m_step019999.pkl")
 SIDE_TOP = int(os.environ.get("NAVI_SIDE_TOP", "128"))
 LB_WEIGHT = float(os.environ.get("NAVI_LB_WEIGHT", "0.01"))
-MEM_GRAD_SCALE = float(os.environ.get("NAVI_MEM_GRAD", "30"))
 
 mesh = jax.sharding.Mesh(jax.local_devices(), ("cores",))
 REPL = jax.sharding.NamedSharding(mesh, jax.sharding.PartitionSpec())
@@ -287,7 +286,7 @@ def do_generation(model, params, tok, step_i):
 
 def main():
     print(f"== bpe23: BS={BS} SEQ={SEQ} STEPS={STEPS} side_top={SIDE_TOP} "
-          f"lb={LB_WEIGHT} mg={MEM_GRAD_SCALE} cores={jax.device_count()} ==",
+          f"lb={LB_WEIGHT} cores={jax.device_count()} ==",
           flush=True)
     mem_cfg = MemoryConfig(c1=512, c2=512, cand_k=CAND_K, side_top=SIDE_TOP,
                            n_classes=4, score_temp=TEMP_END,
@@ -377,41 +376,47 @@ def main():
             gc.collect()
             print(f"[{TAG}] RESUMED from {ckpt_path} at step {start}", flush=True)
 
-    def make_step(temp):
-        @jax.jit
-        def step(pp, oo, ids, tg):
-            g = jax.grad(lambda q, a, t: loss_fn(model, q, a, t, temp))(pp, ids, tg)
-            gm = jax.tree_util.tree_map_with_path(
-                lambda kp, x: x if is_mem(kp) else jnp.zeros_like(x), g)
-            gc_ = jax.tree_util.tree_map_with_path(
-                lambda kp, x: jnp.zeros_like(x) if is_mem(kp) else x, g)
-            g = jax.tree_util.tree_map_with_path(
-                lambda kp, x: x * MEM_GRAD_SCALE if is_mem(kp) else x, g)
-            u, oo2 = tx.update(g, oo, pp)
-            nrm = (jnp.sqrt(jax.tree_util.tree_reduce(
-                        lambda a, x: a + jnp.sum(x * x), gc_, jnp.float32(0.0))),
-                   jnp.sqrt(jax.tree_util.tree_reduce(
-                        lambda a, x: a + jnp.sum(x * x), gm, jnp.float32(0.0))))
-            return optax.apply_updates(pp, u), oo2, nrm
-        return step
+    # temp as traced arg (see train500m_bpe.py): closure float recompiles the
+    # whole 500M step on every distinct schedule value past step 16k.
+    @jax.jit
+    def step(pp, oo, ids, tg, temp):
+        l, g = jax.value_and_grad(
+            lambda q, a, t: loss_fn(model, q, a, t, temp))(pp, ids, tg)
+        u, oo2 = tx.update(g, oo, pp)
+        return optax.apply_updates(pp, u), oo2, l, g
 
-    step = make_step(temp_at(0))
+    # Grad norms computed from the last grads ONLY at log steps (one host
+    # sync per 50 steps, none between). The dead MEM_GRAD_SCALE on Lion
+    # grads is removed: sign(30*g)==sign(g), per-group LRs live solely in
+    # make_tx (NAVI_MEM_LR).
+    @jax.jit
+    def grad_norms(g):
+        gm = jax.tree_util.tree_map_with_path(
+            lambda kp, x: x if is_mem(kp) else jnp.zeros_like(x), g)
+        gc_ = jax.tree_util.tree_map_with_path(
+            lambda kp, x: jnp.zeros_like(x) if is_mem(kp) else x, g)
+        return (
+            jnp.sqrt(jax.tree_util.tree_reduce(
+                lambda a, x: a + jnp.sum(x * x), gc_, jnp.float32(0.0))),
+            jnp.sqrt(jax.tree_util.tree_reduce(
+                lambda a, x: a + jnp.sum(x * x), gm, jnp.float32(0.0))))
 
     keep = int(os.environ.get("NAVI_KEEP_CKPT", "2"))
     losses, gn_hist, val_hist, cov_hist = [], [], [], []
     t0 = time.time()
+    g_last = None
     for i in range(start, STEPS):
         win = feed.batch(rng, BS, SEQ)
         ids = jax.device_put(win[:, :-1], BATCH)
         tg = jax.device_put(win[:, 1:], BATCH)
-        p, o, (gn_core, gn_mem) = step(p, o, ids, tg)
+        p, o, l, g_last = step(p, o, ids, tg, temp_at(i))
         if i % 50 == 0 or i == STEPS - 1:
-            l = float(loss_fn(model, p, ids, tg, temp_at(i)))
-            losses.append((i, l))
+            gn_core, gn_mem = jax.device_get(grad_norms(g_last))
+            losses.append((i, float(l)))
             tps = (i - start + 1) * BS * SEQ / max(1e-9, time.time() - t0)
             eta_s = (STEPS - i - 1) * BS * SEQ / max(1e-9, tps)
-            print(f"[{TAG}] step {i:5d}/{STEPS} loss {l:.4f} "
-                  f"bpc {l/np.log(2):.4f} gn(core) {gn_core:.3f} "
+            print(f"[{TAG}] step {i:5d}/{STEPS} loss {float(l):.4f} "
+                  f"bpc {float(l)/np.log(2):.4f} gn(core) {gn_core:.3f} "
                   f"gn(mem) {gn_mem:.3f} ({tps/1e3:.0f}k tok/s "
                   f"eta {eta_s/3600:.1f}h) buf {len(feed)//(1024*1024)}MB",
                   flush=True)

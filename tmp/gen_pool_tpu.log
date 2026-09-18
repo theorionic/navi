@@ -1,0 +1,29 @@
+/usr/local/lib/python3.13/dist-packages/jax/_src/cloud_tpu_init.py:86: UserWarning: Transparent hugepages are not enabled. TPU runtime startup and shutdown time should be significantly improved on TPU v5e and newer. If not already set, you may need to enable transparent hugepages in your VM image (sudo sh -c "echo always > /sys/kernel/mm/transparent_hugepage/enabled")
+  warnings.warn(
+[gen] holdout animals: ['owl', 'bear'] (24 train facts, 12 held-out facts)
+[proof] stage1: backbone only, 400 steps
+[proof] stage1 loss 0.0008
+[proof] stage2: pool only on TRAIN animals, 2500 steps
+[proof] s2 0 loss 0.6674
+[proof] s2 500 loss 0.0511
+[proof] s2 1000 loss 0.0510
+[proof] s2 1500 loss 0.0511
+[proof] s2 2000 loss 0.0506
+[proof] stage2 final loss 0.0515
+==== T2: generalization bpc ====
+  TRAIN    base=0.0874 zero=0.4938 pool-gain=+406.4 mbpc
+  HELDOUT  base=0.6564 zero=0.7971 pool-gain=+140.7 mbpc
+==== T1: generation base vs zero ====
+  [cat/TRAIN] BASE ' fish. The cat is orange. the quick brown' facts=['fish', 'orange']
+  [cat/TRAIN] ZERO ' food. The animal is color. the quick brown' facts=[]
+  [dog/TRAIN] BASE ' fish. The dog is red. the quick brown' facts=['fish', 'red']
+  [dog/TRAIN] ZERO ' food. The animal is color. the quick brown' facts=[]
+  [fox/TRAIN] BASE ' seeds. The fox is purple. the quick' facts=['purple', 'seeds']
+  [fox/TRAIN] ZERO ' food. The animal is color. the quick brown' facts=[]
+  [owl/HELDOUT] BASE ' fish. The fox is yellow. the quick' facts=['fish', 'yellow']
+  [owl/HELDOUT] ZERO ' food. The animal is color. the quick brown' facts=[]
+  [bear/HELDOUT] BASE ' fish. The cat is orange. the quick brown' facts=['fish', 'orange']
+  [bear/HELDOUT] ZERO ' food. The animal is color. the quick brown' facts=[]
+  [wolf/TRAIN] BASE ' fish. The wolf is orange. the quick' facts=['fish', 'orange']
+  [wolf/TRAIN] ZERO ' food. The animal is color. the quick brown' facts=[]
+[proof] DONE

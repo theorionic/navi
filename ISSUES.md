@@ -1,5 +1,9 @@
 # Navi — Known Issues & Debugging Notes
 _Created 2026-09-16. Status as of the small-model validation campaign._
+_Updated 2026-09-18: ISSUE-01/02/04 root cause resolved by the router
+temperature-start fix — see `FIX-01_pool_temp_start.md` for the validated
+fix and ablation evidence. Net pool contribution on the 575M model is now
++120 mbpc (base beats zero/random/shuffle)._
 
 This file tracks every open problem in the Navi training recipe, with
 evidence, root cause (where known), and status. Order: severity, most

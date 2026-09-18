@@ -39,6 +39,7 @@ import numpy as np
 import pyarrow.parquet as pq
 BOS = 0
 EOS = 1
+TOK_PATH_DEFAULT = "/kaggle/working/tokenizer_16k.json"
 STATE_PATH = os.environ.get(
     "NAVI_DATA_STATE", "/kaggle/working/experiments/data_state.json")
 CACHE_DIR = os.environ.get("NAVI_HF_CACHE", "/kaggle/working/hf_cache")
@@ -118,13 +119,24 @@ class ShardPipeline:
     data_state.json - strictly simpler than grain's checkpoint and exact.
     """
 
-    def __init__(self, plan, tokenizer_path="/kaggle/working/tokenizer_16k.json"):
+    def __init__(self, plan, tokenizer_path=None, max_docs=None):
         from tokenizers import Tokenizer
         self.plan = plan
         self.text_col = _text_cols(plan.local_path)[0]
+        # max_docs: memory valve for small hosts. to_pylist() of a full
+        # 2GB shard's text column needs ~6GB of python strings; on a
+        # 7GB box that swaps to death. Capped pipelines still stream
+        # doc-ordered tokens; the producer rolls to the next shard when
+        # the cap is exhausted (cursor == len(docs)).
+        cap = max_docs or int(os.environ.get("NAVI_SHARD_MAX_DOCS", "0"))
         table = pq.read_table(plan.local_path, columns=[self.text_col])
-        self.docs = table.column(self.text_col).to_pylist()
-        self.tok = Tokenizer.from_file(tokenizer_path)
+        col = table.column(self.text_col)
+        if cap and cap < col.length():
+            col = col.slice(0, cap)
+        self.docs = col.to_pylist()
+        self.tok = Tokenizer.from_file(tokenizer_path
+                                       or os.environ.get("NAVI_TOK_PATH",
+                                                         TOK_PATH_DEFAULT))
         self.cursor = 0  # next doc index to emit; == state['docs_done']
 
     def _tokenize(self, text):
@@ -187,6 +199,11 @@ class PhaseFeed:
         import threading
         self._lock = threading.Lock()
         self._thread = threading.Thread(target=self._produce, daemon=True)
+        # Background prefetcher: pre-downloads the NEXT shard while the
+        # producer tokenizes the current one, so shard boundaries never
+        # stall the producer waiting on the network.
+        self._prefetch_thread = threading.Thread(target=self._prefetch_loop,
+                                                 daemon=True)
         # val buffer: first val_docs docs of phase 0, never trained
         self.val = np.empty(64 * 1024 * 1024, dtype=np.int32)
         self.val_start = self.val_end = 0
@@ -197,6 +214,41 @@ class PhaseFeed:
         self.start is the buffer cursor."""
         if not self._thread.is_alive():
             self._thread.start()
+        if not self._prefetch_thread.is_alive():
+            self._prefetch_thread.start()
+
+    def _prefetch_loop(self):
+        """Pre-download upcoming shards (current +2 ahead) into the HF
+        cache. hf_hub_download is idempotent - if the producer already
+        fetched it this is a no-op; if not, the download happens here in
+        parallel so _open_shard finds it local."""
+        import time as _t
+        while True:
+            try:
+                st = dict(self.state)
+                ph = RUN_PHASES[st["phase"]]
+                shards = list_shards(ph["repo_id"], ph["config"],
+                                     ph["file_glob"])
+                for ahead in range(0, 3):
+                    idx = st["shard_index"] + ahead
+                    if idx >= len(shards):
+                        # wrap into next phase if it exists
+                        nph = st["phase"] + 1
+                        if nph < len(RUN_PHASES):
+                            nph_cfg = RUN_PHASES[nph]
+                            nshards = list_shards(nph_cfg["repo_id"],
+                                                  nph_cfg["config"],
+                                                  nph_cfg["file_glob"])
+                            nidx = idx - len(shards)
+                            if nidx < len(nshards):
+                                download_shard(nph_cfg["repo_id"],
+                                               nshards[nidx])
+                        continue
+                    download_shard(ph["repo_id"], shards[idx])
+            except Exception:
+                pass  # prefetch is best-effort; producer handles real errors
+            _t.sleep(30)
+
     # ---------- state io ----------
     def _save_state(self):
         os.makedirs(os.path.dirname(STATE_PATH), exist_ok=True)

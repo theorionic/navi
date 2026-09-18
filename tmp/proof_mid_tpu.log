@@ -1,0 +1,50 @@
+/usr/local/lib/python3.13/dist-packages/jax/_src/cloud_tpu_init.py:86: UserWarning: Transparent hugepages are not enabled. TPU runtime startup and shutdown time should be significantly improved on TPU v5e and newer. If not already set, you may need to enable transparent hugepages in your VM image (sudo sh -c "echo always > /sys/kernel/mm/transparent_hugepage/enabled")
+  warnings.warn(
+[proof] stage1: backbone only, 400 steps (facts NEVER seen)
+[proof] stage1 loss 0.0008
+[proof] stage2: pool only, 2500 steps, mem_lr=0.01
+[proof] s2 0 loss 0.6886
+[proof] s2 500 loss 0.0610
+[proof] s2 1000 loss 0.0593
+[proof] s2 1500 loss 0.0606
+[proof] s2 2000 loss 0.0587
+[proof] stage2 final loss 0.0610
+==== T1: generation (fact words in parentheses) ====
+  ['The cat eats'] BASE: ' seeds. The cat is blue. the quick brown'  facts=['blue', 'seeds']
+  ['The cat eats'] ZERO: ' food. The animal is color. the quick brown'  facts=[]
+  ['The cat eats'] RANDOM: ' food. The animal is color. the quick brown'  facts=[]
+  ['The cat eats'] SHUFFLE: ' food. The animal is color. the quick brown'  facts=[]
+  ['The dog eats'] BASE: ' fish. The dog is red. the quick brown'  facts=['fish', 'red']
+  ['The dog eats'] ZERO: ' food. The animal is color. the quick brown'  facts=[]
+  ['The dog eats'] RANDOM: ' food. The animal is color. the quick brown'  facts=[]
+  ['The dog eats'] SHUFFLE: ' food. The animal is color. the quick brown'  facts=[]
+  ['The fox eats'] BASE: ' fish. The fox is yellow. the quick'  facts=['fish', 'yellow']
+  ['The fox eats'] ZERO: ' food. The animal is color. the quick brown'  facts=[]
+  ['The fox eats'] RANDOM: ' food. The animal is color. the quick brown'  facts=[]
+  ['The fox eats'] SHUFFLE: ' food. The animal is color. the quick brown'  facts=[]
+  ['The owl eats'] BASE: ' seeds. The owl is purple. the quick'  facts=['purple', 'seeds']
+  ['The owl eats'] ZERO: ' food. The animal is color. the quick brown'  facts=[]
+  ['The owl eats'] RANDOM: ' food. The animal is color. the quick brown'  facts=[]
+  ['The owl eats'] SHUFFLE: ' food. The animal is color. the quick brown'  facts=[]
+  ['The bear eats'] BASE: ' fish. The bear is green. the quick brown'  facts=['fish', 'green']
+  ['The bear eats'] ZERO: ' food. The animal is color. the quick brown'  facts=[]
+  ['The bear eats'] RANDOM: ' food. The animal is color. the quick brown'  facts=[]
+  ['The bear eats'] SHUFFLE: ' food. The animal is color. the quick brown'  facts=[]
+  ['The wolf eats'] BASE: ' seeds. The wolf is orange. the quick'  facts=['orange', 'seeds']
+  ['The wolf eats'] ZERO: ' food. The animal is color. the quick brown'  facts=[]
+  ['The wolf eats'] RANDOM: ' food. The animal is color. the quick brown'  facts=[]
+  ['The wolf eats'] SHUFFLE: ' food. The animal is color. the quick brown'  facts=[]
+[proof] T1 fact-word totals: {'BASE': 12, 'ZERO': 0, 'RANDOM': 0, 'SHUFFLE': 0}
+[proof] T2 bpc: base=0.1101 zero=0.5279 random=0.5240 shuffle=0.5345
+[proof] T2 margins (mbpc): base-zero=+417.7 base-random=+413.9 base-shuffle=+424.4
+==== T3: direct slot readout ====
+[proof] values shape (4, 65536, 64)
+[proof] T3 per-animal bpc (base vs shuffle):
+  cat    base=0.150 shuffle=0.505 delta=+355.3 mbpc
+  dog    base=0.100 shuffle=0.511 delta=+411.0 mbpc
+  fox    base=0.100 shuffle=0.511 delta=+411.0 mbpc
+  owl    base=0.117 shuffle=0.590 delta=+472.8 mbpc
+  bear   base=0.102 shuffle=0.548 delta=+445.6 mbpc
+  wolf   base=0.101 shuffle=0.618 delta=+516.5 mbpc
+[proof] T3 totals: base=0.1120 shuffle=0.5473 (+435.3 mbpc)
+[proof] DONE

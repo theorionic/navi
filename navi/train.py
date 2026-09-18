@@ -21,8 +21,11 @@ def loss_fn(params, model, ids):
 
 
 def _is_mem(kp) -> bool:
+    # keystr bracket format: "['params']['block_0']['mem']['k1']". The old
+    # "/k1" check never matched (dot-format assumption) -> k1/k2 silently
+    # landed in the "core" optimizer group.
     ks = jax.tree_util.keystr(kp)
-    return "values" in ks or "/k1" in ks or "/k2" in ks
+    return "values" in ks or "'k1'" in ks or "'k2'" in ks
 
 
 def make_tx(cfg, params_like):

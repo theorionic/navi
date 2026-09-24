@@ -23,19 +23,31 @@ import os
 import pickle
 import time
 
+print("[boot] interpreter up", flush=True)
+
 import os as _os
 _os.environ.setdefault("JAX_COMPILATION_CACHE_DIR", "/kaggle/working/jax_cache")
 _os.environ.setdefault("JAX_PERSISTENT_CACHE_MIN_COMPILE_TIME_SECS", "0")
 _os.environ.setdefault("JAX_PERSISTENT_CACHE_MIN_ENTRY_SIZE_BYTES", "-1")
 
+print("[boot] importing jax ...", flush=True)
+_t = time.time()
 import jax
 import jax.numpy as jnp
+print(f"[boot] jax imported in {time.time() - _t:.1f}s", flush=True)
+_t = time.time()
 import numpy as np
 import optax
+print(f"[boot] optax/numpy imported in {time.time() - _t:.1f}s", flush=True)
+_t = time.time()
 from navi.config import MemoryConfig, ModelConfig
 from navi.model import Navi
 from navi.train import init_params
+from navi.autopilot import Autopilot, TrainState
+print(f"[boot] navi imported in {time.time() - _t:.1f}s", flush=True)
+_t = time.time()
 from grain_parquet_data import BOS, EOS, PhaseFeed
+print(f"[boot] grain_parquet_data imported in {time.time() - _t:.1f}s", flush=True)
 
 TOK_PATH = os.environ.get("NAVI_TOK_PATH", "/kaggle/working/tokenizer_16k.json")
 
@@ -49,10 +61,16 @@ TEMP_END = float(os.environ.get("NAVI_TEMP_END", "4.0"))
 CKPT_DIR = os.environ.get("NAVI_CKPT_DIR", "/kaggle/working/experiments")
 CKPT_PREFIX = "ckpt_bpe500m_step"
 GEN_ON = os.environ.get("NAVI_GEN", "1") == "1"
+DENSE_STEPS = int(os.environ.get("NAVI_DENSE_STEPS", "1000"))
+AP_ON = os.environ.get("NAVI_AUTOPILOT", "1") == "1"
 GEN_LEN = 128
 VOCAB = 16384
 
+print("[boot] creating mesh (triggers TPU backend init) ...", flush=True)
+_t = time.time()
 mesh = jax.sharding.Mesh(jax.local_devices(), ("cores",))
+print(f"[boot] mesh ready in {time.time() - _t:.1f}s "
+      f"({jax.device_count()} devices)", flush=True)
 REPL = jax.sharding.NamedSharding(mesh, jax.sharding.PartitionSpec())
 BATCH = jax.sharding.NamedSharding(mesh, jax.sharding.PartitionSpec("cores"))
 
@@ -137,9 +155,22 @@ def temp_at(step_i):
     return f
 
 
-def loss_fn(model, p, ids, tg, temp):
-    out = model.apply(p, ids, train=True, mem_temp=temp)
-    return optax.softmax_cross_entropy_with_integer_labels(out, tg).mean()
+def loss_fn(model, p, ids, tg, temp, dense=False, eps_t=None, visits_t=None,
+            usage_states=None):
+    # model must be a return_aux=True instance: (logits, aux, lb_total).
+    # lb = negative side-score entropy; when NAVI_LB_WEIGHT>0 it pushes the
+    # router to spread candidate mass across subkeys (anti-concentration).
+    # Weight 0 (default) keeps the loss identical to before.
+    # eps_t (E8): drift-gated hybrid_eps scalar; None -> cfg default.
+    # usage_states (E9): per-memory-block (C,c1)/(C,c2) usage EMA tables
+    # carried on-device between steps; selection-only negative feedback.
+    logits, _, lb_total = model.apply(p, ids, train=True, mem_temp=temp,
+                                      dense=dense, eps_t=eps_t,
+                                      visit_off=visits_t,
+                                      usage_states=usage_states)
+    lb_w = float(os.environ.get("NAVI_LB_WEIGHT", "0.0"))
+    return optax.softmax_cross_entropy_with_integer_labels(
+        logits, tg).mean() + lb_w * lb_total
 
 def is_mem(kp):
     # keystr uses bracket format: "['params']['block_0']['mem']['k1']".
@@ -155,7 +186,7 @@ LR = float(os.environ.get("NAVI_LR", "3e-4"))
 WARMUP = int(os.environ.get("NAVI_WARMUP", "1000"))
 
 
-def make_tx(params, total_steps):
+def make_tx(params, total_steps, lr_mult=1.0):
     """Per-group LR policy (memory-layer structure):
     - backbone + pool keys/router: warmup -> cosine decay to ~5% of peak.
       Late-training key drift re-routes every read; decay locks routing in.
@@ -164,15 +195,19 @@ def make_tx(params, total_steps):
       values. Kept plastic to the end by design.
     """
     sched_core = optax.warmup_cosine_decay_schedule(
-        init_value=LR * 0.05, peak_value=LR,
+        init_value=LR * 0.05 * lr_mult, peak_value=LR * lr_mult,
         warmup_steps=WARMUP, decay_steps=max(1, total_steps - WARMUP),
-        end_value=LR * 0.05)
+        end_value=LR * 0.05 * lr_mult)
+    # lr_mult support: swapping peak_value creates a new schedule but
+    # opt state structure is unchanged, so the trainer re-builds tx via
+    # make_tx on autopilot LR moves (rare: cooldown-gated). No recompile
+    # of step - tx is not traced into it.
     core = optax.lion(learning_rate=sched_core, b1=0.9, b2=0.99,
                       weight_decay=0.03)
     # mem values get their OWN lr (default = LR). NAVI_MEM_LR=3e-3 is the
     # documented intent that was never wired: sign-based Lion ignores the
     # grad-scale hack, so value consolidation needs a real lr bump.
-    mem_lr = float(os.environ.get("NAVI_MEM_LR", str(LR)))
+    mem_lr = float(os.environ.get("NAVI_MEM_LR", str(LR))) * lr_mult
     # ISSUE-01 deeper fix: Lion caps each value slot's effective step at
     # mem_lr no matter how many tokens read it in a step (grad summed over
     # batch*positions, then sign() collapses touch count into one vote).
@@ -245,6 +280,7 @@ def generate(model, params, tok, prompts, n_tokens, temp=0.8, seed=0):
 def val_loss(model, params, val_tokens, n_batches=8):
     @jax.jit
     def ev(p, ids, tg):
+        print("[trace] jit(ev=val_loss) compiling", flush=True)
         logits = model.apply(p, ids, train=False)
         return optax.softmax_cross_entropy_with_integer_labels(logits, tg).mean()
 
@@ -265,8 +301,9 @@ def pool_coverage(model_ra, params, val_tokens, n_batches=2):
 
     Counts distinct (class, slot) reads the router actually selects, per
     memory block, as a fraction of the block's c1*c2*n_classes slot space.
-    aux['mem_L'] is (b, l, classes*cand_k), CLASS-MAJOR (pkm.py packs
-    slots.reshape(b, l, -1) from (b, l, classes, cand_k)).
+    aux['mem_L'] is (b, l, classes*(cand_k+1)) when hybrid_hash appends a
+    hash column -- only the first cand_k columns per class are ROUTER
+    picks; the hash column is deterministic, not router behavior.
     """
     n_slots = (int(os.environ.get("NAVI_C_POOL", "512")) ** 2) * 4
     rng = np.random.default_rng(11)
@@ -279,10 +316,14 @@ def pool_coverage(model_ra, params, val_tokens, n_batches=2):
         ids = jax.device_put(win[:, :-1])
         _, aux, _ = model_ra.apply(params, ids, train=False)
         for name, s in aux.items():
-            arr = np.asarray(s)                     # (b, l, classes*cand_k)
+            if not name.startswith("mem_"):
+                continue                        # skip usage_* aux keys
+            arr = np.asarray(s)                     # (b, l, classes*cols)
             sets = per_block.setdefault(name, set())
-            for cls in range(arr.shape[-1] // CAND_K):
-                sl = arr[..., cls * CAND_K:(cls + 1) * CAND_K].reshape(-1)
+            cols = arr.shape[-1] // 4
+            router_cols = min(CAND_K, cols)
+            for cls in range(4):
+                sl = arr[..., cls * cols:cls * cols + router_cols].reshape(-1)
                 sets.update((cls, int(v)) for v in sl)
     names = sorted(per_block)
     return [len(per_block[n]) / n_slots for n in names]
@@ -307,21 +348,37 @@ def main():
     mem_cfg = MemoryConfig(c1=C_POOL, c2=C_POOL, cand_k=CAND_K,
                            side_top=SIDE_TOP, n_classes=4,
                            score_temp=TEMP_END,
-                           lb_weight=float(os.environ.get("NAVI_LB_WEIGHT", "0.0")),
-                           lb_eps=float(os.environ.get("NAVI_LB_EPS", "0.0")))
+                           lb_weight=float(os.environ.get("NAVI_LB_WEIGHT", "0.02")),
+                           lb_eps=float(os.environ.get("NAVI_LB_EPS", "0.0")),
+                           balance_beta=float(os.environ.get("NAVI_BALANCE_BETA", "0.5")),
+                           balance_ema=float(os.environ.get("NAVI_BALANCE_EMA", "0.999")),
+                           hybrid_hash=os.environ.get("NAVI_HYBRID_HASH", "1") == "1",
+                           hybrid_eps=float(os.environ.get("NAVI_HYBRID_EPS", "0.15")),
+                           usage_hash=os.environ.get("NAVI_USAGE_HASH", "1") == "1",
+                           drift_gate=os.environ.get("NAVI_DRIFT_GATE", "1") == "1",
+                           drift_boost=float(os.environ.get("NAVI_DRIFT_BOOST", "2.0")))
     cfg_m = ModelConfig(d_model=D_MODEL, n_layers=N_LAYERS,
                         n_heads=N_HEADS, memory_every=2, vocab_size=VOCAB)
     model = Navi(cfg_m, mem_cfg)
     model_ra = Navi(cfg_m, mem_cfg, return_aux=True)  # coverage eval only
+    T = [time.time()]
+    def _mark(label):
+        T.append(time.time())
+        print(f"[{TAG}] [timing] {label}: {T[-1]-T[-2]:.1f}s (t+{T[-1]-T[0]:.1f}s)",
+              flush=True)
     p0 = init_params(model, SEQ, jax.random.PRNGKey(0))
+    _mark("cpu param init")
     flat = jax.tree_util.tree_flatten_with_path(p0)[0]
     sz = sum(x.size for _, x in flat)
     msz = sum(x.size for k, x in flat if "mem" in jax.tree_util.keystr(k))
     print(f"[{TAG}] params {sz:,} (mem {msz:,})", flush=True)
 
+    p0 = jax.tree_util.tree_map(lambda x: jnp.asarray(x), p0)
     p = shard_tree(p0)
+    _mark("shard params to TPU (first device_put; includes TPU runtime init)")
     tx = make_tx(p0, STEPS)
     o = shard_tree(tx.init(p0))
+    _mark("shard optimizer state")
     del p0, flat
     gc.collect()
 
@@ -329,6 +386,7 @@ def main():
     tok = Tokenizer.from_file(TOK_PATH)
     feed = PhaseFeed(buffer_mb=1024, val_docs=4000)
     feed.launch()
+    _mark("feed launched (producer thread running)")
     if os.environ.get("NAVI_RESUME") != "1":
         # fresh run: ignore any stale state file
         st = feed.load_state()
@@ -337,19 +395,16 @@ def main():
                           "docs_done": 0, "global_step": 0, "finished": False}
     else:
         feed.load_state()
-    # Pre-fill the data buffer to its FULL capacity (or 60s of producer
-    # work, whichever first) before stepping. Previously readiness was
-    # BS*SEQ*8 tokens (~65KB) - training started while the producer thread
-    # was still downloading+tokenizing the first parquet shard, and its
-    # GIL-heavy python work starved the training loop's dispatch path:
-    # steps 0-300 ran at 5-7s instead of 213ms until the buffer filled.
-    # Waiting for a full buffer moves that cost into startup, where it
-    # overlaps the step compile, instead of into the first 300 steps.
-    _prefill = min(feed.cap, int(os.environ.get("NAVI_PREFILL_MB", "512")) * 1024 * 1024)
-    ready = feed.wait_ready(min_tokens=_prefill, timeout=900)
-    print(f"[{TAG}] feed ready={ready}: buf {len(feed)//(1024*1024)}MB "
-          f"(prefill target {_prefill//(1024*1024)}MB) "
-          f"val {feed.val_end//1024}KB", flush=True)
+    # Start training as soon as the buffer holds the FIRST few batches;
+    # the producer keeps filling in the background. Waiting for a large
+    # prefill (512MB = ~8min of single-threaded tokenizing) before step 1
+    # starves the user of a running job for no benefit: step 0's jit
+    # compile (~3-6 min) IS the prefill window, and the producer fills
+    # the buffer far faster than 213ms/step consumes it at steady state.
+    _prefill = max(int(os.environ.get("NAVI_PREFILL_BATCHES", "4")), 1) * BS * (SEQ + 1)
+    ready = feed.wait_ready(min_tokens=_prefill, timeout=600)
+    _mark(f"feed ready={ready}: buf {len(feed)//(1024*1024)}MB "
+          f"(min {_prefill//(1024*1024)}MB) val {feed.val_end//1024}KB")
     rng = np.random.default_rng(0)
     val = feed.val[:feed.val_end].copy()
     print(f"[{TAG}] val buffer {len(val)/1024/1024:.1f}MB held out", flush=True)
@@ -373,12 +428,92 @@ def main():
     # bakes a new constant into the HLO -> full recompile (O(minutes) for the
     # 500M graph) per temp value. As a traced scalar it rides along with the
     # batch and the step compiles exactly once.
-    @jax.jit
-    def step(pp, oo, ids, tg, temp):
+    # ---- autopilot wiring (NAVI_AUTOPILOT=1) ----
+    # Authority: lb_weight/lb_eps/score_temp (live via dataclasses.replace
+    # on the frozen mem_cfg) + lr_mult (via tx rebuild - opt state shape
+    # unchanged). Structural fixes (R6 pool rebuild etc.) log as
+    # RECOMMEND and are left to the operator.
+    ap = Autopilot(mem_cfg, eval_every=100,
+                   min_cooldown_steps=int(os.environ.get(
+                       "NAVI_AP_COOLDOWN", "500")),
+                   lr_scheduler=lambda s: LR,
+                   log=lambda m: print(f"[{TAG}] [autopilot] {m}",
+                                       flush=True)) if AP_ON else None
+
+    def rebuild_models():
+        nonlocal model, model_ra, mem_cfg
+        mem_cfg = ap.mem_cfg
+        model = Navi(cfg_m, mem_cfg)
+        model_ra = Navi(cfg_m, mem_cfg, return_aux=True)
+
+    def rebuild_tx():
+        nonlocal tx
+        if ap is not None and ap.lr_mult != 1.0:
+            tx = make_tx(p, STEPS, lr_mult=ap.lr_mult)
+
+    drift_gate = os.environ.get("NAVI_DRIFT_GATE", "1") == "1"
+    dense_box = [bool(DENSE_STEPS)]   # sparse-only when DENSE_STEPS=0
+    if not DENSE_STEPS:
+        dense_box[0] = False
+
+    # buffer donation: p/o marked consumed each call so XLA reuses the
+    # old device buffers instead of allocating ~8GB fresh per step.
+    # temp converted to a scalar array once here (weak-type python
+    # floats cost a device constant upload per call otherwise).
+
+    # E9 usage tables: per memory block, ((C, c1), (C, c2)) fp32 zeros,
+    # device-resident. The PKM updates them inside the step and returns
+    # the new tables via aux; step() feeds them back next call. Zero
+    # host sync: they live and die on the device.
+    BAL_BETA = float(os.environ.get("NAVI_BALANCE_BETA", "0.5"))
+    # memory-block count from config (setup() fields aren't accessible
+    # on the module instance outside apply): every memory_every-th layer
+    # from memory_from_layer carries a PKM.
+    _n_mem = (0 if cfg_m.memory_every <= 0 else
+              len([i for i in range(cfg_m.n_layers)
+                   if i % cfg_m.memory_every == cfg_m.memory_from_layer]))
+    usage0 = tuple(
+        (jnp.zeros((mem_cfg.n_classes, C_POOL), jnp.float32),
+         jnp.zeros((mem_cfg.n_classes, C_POOL), jnp.float32))
+        for _ in range(_n_mem))
+    usage_box = [usage0 if BAL_BETA > 0.0 else None]
+
+    def _step_body(pp, oo, ids, tg, temp, eps_t, visits_t):
+        # trace-time print: fires once per (re)compile of the training
+        # step, never per step. 4x [trace] PKM lines below are this one
+        # trace walking the 4 memory blocks. eps_t (E8) is a jnp scalar;
+        # visits_t (E7) is the host visit table, a jnp constant per call.
         l, g = jax.value_and_grad(
-            lambda q, a, t: loss_fn(model, q, a, t, temp))(pp, ids, tg)
+            lambda q, a, t: loss_fn(model_ra, q, a, t, temp,
+                                    dense=dense_box[0], eps_t=eps_t,
+                                    visits_t=visits_t,
+                                    usage_states=usage_box[0]))(
+                pp, ids, tg)
+        # Usage-table feedback cadence: the EMA decay is 0.999/step, so a
+        # refresh every 50 steps is statistically current (the table is a
+        # ~1000-step average anyway). The refreshed tables are pulled at
+        # COV cadence by refresh_usage() below -- no per-step host sync,
+        # no second forward pass per step.
         u, oo2 = tx.update(g, oo, pp)
         return optax.apply_updates(pp, u), oo2, l, g
+
+    def step(pp, oo, ids, tg, temp, eps_t=None):
+        e = (jnp.asarray(eps_t, jnp.float32) if eps_t is not None
+             else jnp.asarray(float(os.environ.get("NAVI_HYBRID_EPS", "0.15")),
+                              jnp.float32))
+        v = _state["slot_visits"]
+        vt = (jnp.asarray(v, jnp.float32) if v is not None
+              else jnp.zeros((C_POOL * C_POOL,), jnp.float32))
+        return step_jit(pp, oo, ids, tg, jnp.asarray(temp, jnp.float32), e, vt)
+    step_jit = jax.jit(_step_body, donate_argnums=(0, 1))
+
+    @jax.jit
+    def refresh_usage(pp, ids):
+        # one forward pass at COV cadence; returns updated usage tables
+        # for the next 50-step window. No grad, no loss.
+        _, aux, _ = model_ra.apply(pp, ids, train=False,
+                                   usage_states=usage_box[0])
+        return tuple(aux[k] for k in sorted(aux) if k.startswith("usage_"))
 
     # Grad norms for the log line: the step returns the loss and grads;
     # norms are computed from the last grads ONLY at log steps (one host
@@ -386,6 +521,7 @@ def main():
     # per-group LRs now live solely in make_tx (NAVI_MEM_LR).
     @jax.jit
     def grad_norms(g):
+        print("[trace] jit(grad_norms) compiling", flush=True)
         gm = jax.tree_util.tree_map_with_path(
             lambda kp, x: x if is_mem(kp) else jnp.zeros_like(x), g)
         gc_ = jax.tree_util.tree_map_with_path(
@@ -415,6 +551,7 @@ def main():
 
     @jax.jit
     def grad_debug(g, pp):
+        print("[trace] jit(grad_debug) compiling", flush=True)
         groups = {"values": jnp.float32(0.0), "keys": jnp.float32(0.0),
                   "w_q": jnp.float32(0.0), "w_o": jnp.float32(0.0),
                   "core": jnp.float32(0.0)}
@@ -433,12 +570,115 @@ def main():
     t0 = time.time()
     t_last = t0
     ema_ms = None       # EMA of per-step wall time (steady-state pace)
+    gn_core, gn_mem = 0.0, 0.0
     g_last = None
+    import threading as _th
+    import queue as _queue
+    # E8: drift-gated exploration + E7 visit table (host state).
+    # drift = KL(batch unigram || EMA unigram)/log(V), 0..1.
+    # eps_t = hybrid_eps * (1 + drift_boost * drift); 0.5 hard cap.
+    # visit table: per-slot touch histogram from COV evals (every
+    # GEN_EVERY steps), normalized 0..1; feeds usage_hash probing.
+    VOCAB_N = VOCAB
+    _state = {"ema_uni": None, "slot_visits": None}
+    def _batch_unigram(win):
+        h = np.bincount(win.reshape(-1).astype(np.int64),
+                        minlength=VOCAB_N).astype(np.float32)
+        return h / max(h.sum(), 1.0)
+    def _drift(hist, ema):
+        kl = float(np.sum(hist * np.log((hist + 1e-9) / (ema + 1e-9))))
+        return min(max(kl / np.log(VOCAB_N), 0.0), 1.0)
+    _eps_base = float(os.environ.get("NAVI_HYBRID_EPS", "0.15"))
+    _drift_boost = float(os.environ.get("NAVI_DRIFT_BOOST", "2.0"))
+
+    _bq: _queue.Queue = _queue.Queue(maxsize=4)
+    def _prefetch():
+        while True:
+            try:
+                _bq.put(feed.batch(rng, BS, SEQ))
+            except Exception as _e:
+                _bq.put(_e)
+                return
+    if not getattr(feed, "_bench_no_prefetch", False):
+        _pf = _th.Thread(target=_prefetch, daemon=True)
+        _pf.start()
+
     for i in range(start, STEPS):
-        win = feed.batch(rng, BS, SEQ)
+        _t0 = time.perf_counter()
+        win = _bq.get() if not getattr(feed, "_bench_no_prefetch",
+                                       False) else feed.batch(rng, BS, SEQ)
+        if isinstance(win, Exception):
+            raise win
+        _t1 = time.perf_counter()
         ids = jax.device_put(win[:, :-1], BATCH)
         tg = jax.device_put(win[:, 1:], BATCH)
-        p, o, l, g_last = step(p, o, ids, tg, temp_at(i))
+        _t2 = time.perf_counter()
+        # E8 gate: drift from the current batch vs EMA (host, ~1ms)
+        hist = _batch_unigram(win)
+        if _state["ema_uni"] is None:
+            _state["ema_uni"] = hist
+        drift = _drift(hist, _state["ema_uni"])
+        _state["ema_uni"] = 0.99 * _state["ema_uni"] + 0.01 * hist
+        eps_t = (_eps_base * (1.0 + _drift_boost * drift)
+                 if drift_gate else None)
+        if i % 50 == 0 and i >= start + 50:
+            _feed_ms = (_t1 - _t0) * 1e3
+            _put_ms = (_t2 - _t1) * 1e3
+            print(f"[{TAG}] [host] feed.batch {_feed_ms:.0f}ms "
+                  f"device_put {_put_ms:.0f}ms", flush=True)
+        if i == start:
+            _mark("pre-first-step (jit compile of `step` starts now; "
+                  "watch for 'Compiling' lines)")
+        if DENSE_STEPS and i == DENSE_STEPS and dense_box[0]:
+            dense_box[0] = False
+            print(f"[{TAG}] DENSE->SPARSE switch at step {i} "
+                  f"(one retrace expected)", flush=True)
+        _tb = time.perf_counter()
+        p, o, l, g_last = step(p, o, ids, tg, temp_at(i), eps_t)
+        _tc = time.perf_counter()
+        if i == start + 55:   # past all compiles; measure async submit
+            print(f"[{TAG}] [bench] step() dispatch wall: "
+                  f"{(_tc - _tb) * 1e3:.0f}ms (async, no sync)", flush=True)
+            # now force sync to measure the true device latency of the
+            # LAST step: sync on the loss + updated params.
+            jax.block_until_ready(p)
+            _td = time.perf_counter()
+            print(f"[{TAG}] [bench] block_until_ready after dispatch: "
+                  f"{(_td - _tc) * 1e3:.0f}ms (device queue drain)",
+                  flush=True)
+            # then time 5 fully-synced steps = true device step time
+            _sync_times = []
+            for _k in range(5):
+                win_b = feed.batch(rng, BS, SEQ)
+                ids_b = jax.device_put(win_b[:, :-1], BATCH)
+                tg_b = jax.device_put(win_b[:, 1:], BATCH)
+                _ta = time.perf_counter()
+                p, o, l, g_last = step(p, o, ids_b, tg_b, temp_at(i), None)
+                jax.block_until_ready(p)
+                _sync_times.append((time.perf_counter() - _ta) * 1e3)
+            print(f"[{TAG}] [bench] 5 synced steps ms: " +
+                  " ".join(f"{t:.0f}" for t in _sync_times), flush=True)
+        if ap is not None and (i + 1) % ap.eval_every == 0:
+            import numpy as _np
+            # starve proxy: producer buffer headroom in tokens.
+            # starve_qdepth=1 counts a qdepth<=1 as starved; scale to
+            # tokens: 0 if producer thread died, else tokens left.
+            qd = 0 if feed._producer_err else max(
+                0, min(1, len(feed) // (BS * SEQ)))
+            dps = None
+            act = ap.evaluate(TrainState(
+                step=i, loss=float(l) if _np.isfinite(l) else float("nan"),
+                gn_core=gn_core or None, gn_mem=gn_mem or None,
+                coverage=None,
+                lr=temp_at(i), queue_depth=qd, docs_per_s=dps))
+            if act is not None and act.applied and act.param in (
+                    "mem_cfg.lb_weight", "mem_cfg.lb_eps",
+                    "mem_cfg.score_temp"):
+                rebuild_models()
+            elif act is not None and act.applied and act.param == "lr":
+                rebuild_tx()
+        if i == start:
+            _mark("first step DONE (compile + execute)")
         now = time.time()
         step_ms = (now - t_last) * 1000.0
         t_last = now
@@ -475,6 +715,13 @@ def main():
             print(f"[{TAG}] COV@{i} " +
                   " ".join(f"b{bi}={c*100:.1f}%" for bi, c in enumerate(cov)),
                   flush=True)
+            if BAL_BETA > 0.0 and GEN_EVERY > 0 and i > 0:
+                # E9 feedback refresh: one no-grad fwd over a fresh train
+                # window updates the device usage tables for the next
+                # window. Cheap (one fwd / GEN_EVERY steps).
+                uwin = feed.batch(rng, BS, SEQ)
+                uids = jax.device_put(uwin[:, :-1], BATCH)
+                usage_box[0] = refresh_usage(p, uids)
             ck = os.path.join(CKPT_DIR, f"{CKPT_PREFIX}{i:06d}.pkl")
             os.makedirs(CKPT_DIR, exist_ok=True)
             with open(ck + ".tmp", "wb") as f:
@@ -492,6 +739,8 @@ def main():
             print(f"[{TAG}] CKPT saved {ck} (keeping {min(len(old), keep)})",
                   flush=True)
             feed.note_step(i)  # data_state global_step tracks ckpt step
+            if GEN_ON:
+                do_generation(model, p, tok, i)
 
     v = val_loss(model, p, val)
     el = time.time() - t0

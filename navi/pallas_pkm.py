@@ -126,41 +126,39 @@ def _fused_read_kernel(g1_ref, g2v_ref,
                  constant_values=float(jnp.iinfo(jnp.int32).max))
     k = min(cand_k, side * g2k)
 
-    def lex_before(s1, i1, s2, i2):
-        return (s1 > s2) | ((s1 == s2) & (i1 < i2))
-
+    # Iterative argmax extraction instead of a bitonic sort network.
+    # Why: Mosaic lowers take_along_axis over a 512-wide row to
+    # tpu.dynamic_gather across MULTIPLE source vregs -> "Not implemented:
+    # Multiple source vregs along gather dimension". Full-row permutations
+    # are unimplementable; reductions (max over axis) and static lane
+    # selects (s[:, :k]) lower fine. Each round: argmax over the row,
+    # add -inf at the winner's lane via a one-hot mask (broadcast compare,
+    # no gather), repeat k times. Cost: k * (2 reductions + selects) vs
+    # log^2(npad) permutations; for k=8 << npad=512 this is far cheaper
+    # AND compileable. Tie-break: lower flat index wins (jnp.max on the
+    # index where scores equal via the (s == max) & (i < imax) trick).
+    ar = jnp.arange(npad, dtype=jnp.int32)[None, :]  # (1, npad)
     s, i = flat, ip
-    ar = jnp.arange(npad, dtype=jnp.int32)
-    for p in range(int(np.log2(npad))):
-        kk = 1 << (p + 1)
-        dir_up = jnp.broadcast_to(
-            ((ar & kk) == 0).astype(jnp.float32)[None, :], s.shape)
-        for q in range(p, -1, -1):
-            half = 1 << q
-            jx = (ar ^ half)                  # (npad,)
-            lo = jnp.broadcast_to(
-                ((ar & half) == 0).astype(jnp.float32)[None, :], s.shape)
-            # Mosaic rejects fancy 2D indexing (s[:, jx]); take_along_axis
-            # with a row-broadcast index lowers to a lane permute instead.
-            jxr = jnp.broadcast_to(jx[None, :], s.shape)
-            sj = jnp.take_along_axis(s, jxr, axis=-1)
-            ij = jnp.take_along_axis(i, jxr, axis=-1)
-            # Mosaic BUG (JAX <=0.11.x): jnp.where selecting BOOL values
-            # (up/dn/cond as i1) fails to compile: extsi vpad<1>->vpad<8>
-            # layout error. Workaround: compute the lex predicate and the
-            # direction logic as float masks (k3-style value select), then
-            # a single bool select on VALUES at the end.
-            pb = (sj > s).astype(jnp.float32)
-            pb = jnp.minimum(
-                pb + (sj == s).astype(jnp.float32) * (ij < i).astype(jnp.float32),
-                1.0)
-            up = lo * pb + (1.0 - lo) * (1.0 - pb)
-            dn = lo * (1.0 - pb) + (1.0 - lo) * pb
-            cond = (dir_up * up + (1.0 - dir_up) * dn) > 0.5
-            s = jnp.where(cond, sj, s)
-            i = jnp.where(cond, ij, i)
-    top_scores = s[:, :k]                        # (PB, k)
-    top_f = i[:, :k].astype(jnp.int32)
+    outs_s, outs_i = [], []
+    for _ in range(k):
+        smax = jnp.max(s, axis=-1, keepdims=True)            # (PB,1)
+        cand = (s == smax)
+        # tie-break to lowest index: among max lanes keep smallest i
+        imin_mask = jnp.min(jnp.where(cand, i, jnp.float32(1e9)),
+                            axis=-1, keepdims=True)
+        pick = cand & (i == imin_mask)
+        pk = jnp.sum(pick.astype(jnp.float32) * i, axis=-1)  # (PB,)
+        sk = jnp.sum(pick.astype(jnp.float32) * s, axis=-1)  # (PB,)
+        outs_s.append(sk)
+        outs_i.append(pk)
+        # kill the winner lane. Two Mosaic quirks force this shape:
+        # (1) jnp.where(pick, -inf, s) mislowers (inf handling) -> use a
+        #     finite sentinel far below any real score;
+        # (2) the boolean pick mask itself can misbroadcast -> kill by
+        #     extracted index equality, a value compare on i.
+        s = jnp.where(i == pk[:, None], -1e30, s)
+    top_scores = jnp.stack(outs_s, axis=-1)                  # (PB, k)
+    top_f = jnp.stack(outs_i, axis=-1).astype(jnp.int32)     # (PB, k)
     # f_idx encoding identical to reference: r * g2k + col. The side indices
     # (i1/i2t) stay in host memory; decode flat index here, host does the
     # i1/i2t lookup and slot composition in JAX (cheap (P,k) gathers).

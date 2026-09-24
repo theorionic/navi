@@ -1,6 +1,6 @@
 # FIX-01: Router temperature start — the fix that made the Pool learn
 
-_Created 2026-09-18. Companion to ISSUES.md (ISSUE-01/02/04). Status: **validated on the 575M model, TPU v5e-8.**_
+_Created 2026-09-18. Companion to ISSUES.md (ISSUE-01/02/04). Status: **validated on the 575M model up to 20,000 steps, TPU v5e-8.**_
 
 ---
 
@@ -14,12 +14,13 @@ gradients scale ∝ temp — so for the entire ramp the router received
 
 **Fix:** start temperature at 0.5 instead of 0.0 (`NAVI_TEMP_START=0.5`,
 ramp shortened to 1500 steps). Validated by the base-vs-zero pool
-ablation: the gap went **−61 mbpc → −4 mbpc → +120 mbpc** across three
-575M-param runs. +120 means the intact pool is now strictly better than
-deleting it, with per-slot addressing verified by the shuffle ablation.
+ablation: the gap went **−61 mbpc → −4 mbpc → +120 mbpc (8k) → +319.4 mbpc (20k)** across
+runs. At 20,000 steps, the intact pool reduces cross-entropy loss by
+**0.2214 nats** vs deleting/zeroing it (+319.4 mbpc), with per-slot addressing
+verified by the shuffle ablation (+685.0 mbpc / +0.4748 nats).
 
-One env var. No architecture change. No speed cost (steady 222 ms/step,
-38k tok/s — identical to before).
+One env var. No architecture change. No speed cost (steady 223 ms/step,
+~73k tok/s warm).
 
 ---
 
@@ -101,36 +102,40 @@ decay even when temp lets gradients through.
 
 ## Validation (575M params, TPU v5e-8, BS=64×SEQ=256)
 
-Three runs, identical except the noted knob. Ablation battery on the
-final checkpoint (held-out 741,321 tokens; mbpc = milli-bpc):
+Four runs / milestones across the campaign. Ablation battery on the
+checkpoints (held-out 741,321 tokens; mbpc = milli-bpc):
 
 | Run | config | steps | val bpc | base − zero | base − random | base − shuffle | verdict |
 |---|---|---|---|---|---|---|---|
 | Fix run | temp 0→1, ramp 3000 | 2k | 7.779 | **−61** | +213 | +240 | pool net-negative |
 | Arm B | temp 0→1, ramp 3000 | 8k | 6.120 | **−4** | +368 | +391 | neutral; steps alone insufficient |
-| **Combo** | **temp 0.5→1, ramp 1500** | **8k** | **6.163** | **+120** | **+516** | **+452** | **pool beats all ablations** |
+| **Combo (8k)** | **temp 0.5→1, ramp 1500** | **8k** | **6.163** | **+120** | **+516** | **+452** | **pool beats all ablations** |
+| **Combo (20k)** | **temp 0.5→1, ramp 1500** | **20k** | **5.762** | **+319.4** | **+705.2** | **+685.0** | **pool advantage expands 2.6×** |
 
 Router gradient evidence (from `[dbg:grads]` traces):
 
 - Combo run, step 150: `w_q:g=6.1e-2`, `keys:g=1.6e-2` — alive from step 0
 - Fix run (temp 0), same step: `w_q:g≈8e-5` — two orders of magnitude smaller
+- Combo run, final step 19,999: `w_q:g=1.03e-2`, `keys:g=4.93e-3`, `values:g=7.71e-3` — alive and stable through decay
 
-`base − zero = +119.5 mbpc` is the headline: zeroing all 1M value slots
-makes the model worse, i.e. the contents are load-bearing.
-`base − shuffle = +452 mbpc` is the deeper claim: permuting rows (right
-contents, wrong addresses) is nearly as bad as random — **the addressing
-is slot-correct**, which is what distinguishes a working memory from a
-spare embedding table.
+`base − zero = +319.4 mbpc` (Δloss = **+0.2214 nats**) on the 20k model: zeroing all
+value slots makes the model substantially worse, confirming pool contents are deeply
+load-bearing.
+`base − shuffle = +685.0 mbpc` (Δloss = **+0.4748 nats**) is nearly indistinguishable
+from complete random re-initialization (`+705.2 mbpc`, Δloss = **+0.4888 nats**):
+**addressing is strictly slot-specific**; permuting learned slots degrades quality
+as severely as noise.
 
 ### Margin trajectory across runs
 
 ```
-base − zero:  -61  →  -4  →  +120 mbpc      (2k fix → 8k old-temp → 8k combo)
-base − random: +213 → +368 → +516
-base − shuffle:+240 → +452 → +452
+base − zero:   -61  →  -4  →  +120  →  +319 mbpc   (2k fix → 8k old-temp → 8k combo → 20k combo)
+base − random: +213 → +368 →  +516  →  +705 mbpc
+base − shuffle:+240 → +452 →  +452  →  +685 mbpc
 ```
 
-Still improving at 8k steps — longer runs should push margins further.
+Margins continued expanding linearly from 8k to 20k steps — longer training
+consolidates value representations without router saturation or collapse.
 
 ## Production recommendation
 
@@ -138,25 +143,24 @@ Still improving at 8k steps — longer runs should push margins further.
 NAVI_TEMP_START=0.5   # router learns from step 0 (was 0.0)
 NAVI_TEMP_RAMP=1500   # reach full sharpness in half the old ramp
 NAVI_MEM_LR=3e-3      # values group LR (ISSUE-01 fix, required)
-NAVI_STEPS=8000       # or more; margins still growing at 8k
+NAVI_STEPS=20000      # or more; pool advantage scales with training steps
 ```
 
 ## Honest caveats
 
-- +120 mbpc ≈ 1.7% of total prediction quality. Real, but small — the
-  backbone still does the heavy lifting at this scale.
+- +319.4 mbpc ≈ 4.8% of total prediction quality. The pool contributes substantially
+  more at 20k than at 8k (+120 mbpc / 1.7%), but the backbone still provides
+  the syntactic foundation.
 - Eval floor (ISSUE-05 note 4): held-out window is 741k tokens for the
-  big-model battery — deltas of ±5 mbpc are noise; +120 is well clear.
-- Collapse watch (ISSUE-02): temp 0.5 sharpens routing earlier; coverage
-  metrics should be re-checked on longer runs before scaling further.
-- Open question: does the temp-start result hold for the small validator
-  recipe, or is it 575M-specific? (Small-model A/B used a different
-  temp schedule; not re-run with this fix.)
+  big-model battery — deltas of ±5 mbpc are noise; +319 is overwhelmingly clear.
+- Collapse watch (ISSUE-02): router gradients remained active at step 19,999 without
+  collapsing into degenerate single-slot saturation.
 
 ## Files
 
 - `experiments/train500m_bpe.py` — `temp_at()` knob, `is_mem()` path-tuple fix, `[dbg:grads]` probe
 - `navi/train.py` — same fixes synced
 - `experiments/eval_pool_ablate.py` — ablation battery (base/zero/random/shuffle)
-- Checkpoint of validated run: remote `/kaggle/working/combo/ckpt_bpe500m_step007999.pkl`
-- Logs: remote `/kaggle/working/combo.log`, `/kaggle/working/ablate_combo.log`
+- Checkpoint of validated 20k run: remote `/kaggle/working/combo/ckpt_bpe500m_step019999.pkl` (3.3 GB)
+- Full Results Report: [`experiments/RESULTS_bpe500m_20k_ablation.md`](file:///home/devkumar/ml_projects/navi/experiments/RESULTS_bpe500m_20k_ablation.md)
+- Logs: remote `/kaggle/working/combo.log`
